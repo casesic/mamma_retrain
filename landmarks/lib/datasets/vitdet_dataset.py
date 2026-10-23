@@ -21,6 +21,7 @@ class ViTDetDataset(torch.utils.data.Dataset):
                  mask_cv2: np.array,
                  boxes: np.array,
                  train: bool = False,
+                 fast_inference: bool = False,
                  **kwargs):
         super().__init__()
         self.cfg = cfg
@@ -29,6 +30,7 @@ class ViTDetDataset(torch.utils.data.Dataset):
 
         assert train == False, "ViTDetDataset is only for inference"
         self.train = train
+        self.fast_inference = fast_inference
         self.img_size = (cfg.data_cfg['image_size'][1], cfg.data_cfg['image_size'][0]) #cfg.model["backbone"]["img_size"] #[0]
         self.mean = DEFAULT_MEAN #255. * np.array(self.cfg.MODEL.IMAGE_MEAN)
         self.std = DEFAULT_STD # 255. * np.array(self.cfg.MODEL.IMAGE_STD)
@@ -58,14 +60,30 @@ class ViTDetDataset(torch.utils.data.Dataset):
 
         # 3. generate image patch
         # if use_skimage_antialias:
-        cvimg = self.img_cv2.copy()
-        cvmask = self.mask_cv2.copy() if self.mask_cv2 is not None else None
-        if True:
-            # Blur image to avoid aliasing artifacts
-            downsampling_factor = ((bbox_size.max()*1.0) / patch_width)
-            downsampling_factor = downsampling_factor / 2.0
-            if downsampling_factor > 1.1:
-                cvimg  = gaussian(cvimg, sigma=(downsampling_factor-1)/2, channel_axis=2, preserve_range=True)
+        downsampling_factor = bbox_size.max() / patch_width / 2.0
+        sigma = (downsampling_factor - 1) / 2 if downsampling_factor > 1.1 else 0
+        if self.fast_inference:
+            # warpAffine only samples the expanded person box. Include the
+            # Gaussian kernel's support and interpolation margin in the ROI.
+            margin = int(np.ceil(4 * sigma)) + 3
+            x0 = max(0, int(np.floor(center_x - w_bbox_size / 2)) - margin)
+            y0 = max(0, int(np.floor(center_y - h_bbox_size / 2)) - margin)
+            x1 = min(self.img_cv2.shape[1], int(np.ceil(center_x + w_bbox_size / 2)) + margin)
+            y1 = min(self.img_cv2.shape[0], int(np.ceil(center_y + h_bbox_size / 2)) + margin)
+            cvimg = self.img_cv2[y0:y1, x0:x1]
+            cvmask = self.mask_cv2[y0:y1, x0:x1] if self.mask_cv2 is not None else None
+            center_x -= x0
+            center_y -= y0
+        else:
+            cvimg = self.img_cv2.copy()
+            cvmask = self.mask_cv2.copy() if self.mask_cv2 is not None else None
+        if sigma:
+            if self.fast_inference:
+                cvimg = cv2.GaussianBlur(cvimg.astype(np.float32), (0, 0),
+                                         sigmaX=sigma, sigmaY=sigma,
+                                         borderType=cv2.BORDER_REFLECT)
+            else:
+                cvimg = gaussian(cvimg, sigma=sigma, channel_axis=2, preserve_range=True)
 
         img_patch_cv, mask_patch, trans = generate_image_patch_cv2(cvimg, cvmask,
                                                     center_x, center_y,
@@ -73,13 +91,23 @@ class ViTDetDataset(torch.utils.data.Dataset):
                                                     patch_width, patch_height,
                                                     False, 1.0, 0,
                                                     border_mode=cv2.BORDER_CONSTANT)
-        img_patch_cv = img_patch_cv[:, :, ::-1]
-        img_patch = convert_cvimg_to_tensor(img_patch_cv)
+        if self.fast_inference and img_patch_cv.shape[2] == 3:
+            img_patch_cv = cv2.cvtColor(img_patch_cv, cv2.COLOR_BGR2RGB)
+        else:
+            img_patch_cv = img_patch_cv[:, :, ::-1]
+        if self.fast_inference and img_patch_cv.shape[2] == 3:
+            img_patch = img_patch_cv.transpose(2, 0, 1).astype(np.float32)
+        else:
+            img_patch = convert_cvimg_to_tensor(img_patch_cv)
         mask_patch = convert_cvimg_to_tensor(mask_patch[:,:,None])/255.0 if mask_patch is not None else 0
 
         # apply normalization
         for n_c in range(min(self.img_cv2.shape[2], 3)):
-            img_patch[n_c, :, :] = (img_patch[n_c, :, :] - self.mean[n_c]) / self.std[n_c]
+            if self.fast_inference:
+                img_patch[n_c, :, :] -= self.mean[n_c]
+                img_patch[n_c, :, :] /= self.std[n_c]
+            else:
+                img_patch[n_c, :, :] = (img_patch[n_c, :, :] - self.mean[n_c]) / self.std[n_c]
 
         item = {
             'img': img_patch,
@@ -88,5 +116,5 @@ class ViTDetDataset(torch.utils.data.Dataset):
         }
         item['box_center'] = self.center[idx].copy()
         item['box_size'] = bbox_size
-        item['img_size'] = 1.0 * np.array([cvimg.shape[1], cvimg.shape[0]])
+        item['img_size'] = 1.0 * np.array([self.img_cv2.shape[1], self.img_cv2.shape[0]])
         return item

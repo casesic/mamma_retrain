@@ -1,0 +1,4 @@
+{
+  "schema": "mamma_reader_v1",
+  "manifest": "../../../human_data_generator/outputs/runs/key_batch_001/observations.json"
+}

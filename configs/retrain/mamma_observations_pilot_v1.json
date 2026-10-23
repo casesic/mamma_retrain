@@ -1,0 +1,1873 @@
+{
+  "schema": "mamma_observation_v1",
+  "version": 1,
+  "eligibility": "integration_only",
+  "source_inventory_read_only": "/mnt/data1/yy/home/yy/Projects/densekp_retrain/outputs/audits/mamma_retrain_a1_20261013/reuse_inventory.json",
+  "observations": [
+    {
+      "episode": "e01",
+      "rig": "rig_edge",
+      "observation_id": "f0_cam2_p1",
+      "status": "observed",
+      "reason": "",
+      "person_id": 1,
+      "camera_id": "cam2",
+      "frame_index": 0,
+      "source_frame_index": 9615,
+      "source_time_tick": 4006253205,
+      "source_time_base": [
+        1,
+        10000000
+      ],
+      "asset_frame_index": 15,
+      "source_ref": "/mnt/data1/yy/home/yy/Projects/densekp_retrain/outputs/experiments/first_four_episodes_a1_20261011/e01/rider_adapter.json",
+      "person_timeline_ref": "/mnt/data1/yy/home/yy/Projects/densekp_retrain/outputs/experiments/first_four_episodes_a1_20261011/e01/run/person1_timeline.json",
+      "scene_matrices_ref": "/mnt/data1/yy/home/yy/Projects/densekp_retrain/outputs/experiments/first_four_episodes_a1_20261011/e01/run/scene_matrices.npy",
+      "scene_matrix_row": 0,
+      "scene_matrix_person_index": 0,
+      "full_image_size_wh": [
+        5760,
+        2880
+      ],
+      "files": {
+        "image": {
+          "path": "/mnt/data1/yy/home/yy/Projects/densekp_retrain/outputs/experiments/first_four_episodes_a1_20261011/e01/run/frame_000/cam2/roi.png",
+          "exists": true,
+          "png_size_wh": [
+            1100,
+            1424
+          ],
+          "mode": "RGB"
+        },
+        "person_mask": {
+          "path": "/mnt/data1/yy/home/yy/Projects/densekp_retrain/outputs/experiments/first_four_episodes_a1_20261011/e01/run/frame_000/cam2/person_1_mask.png",
+          "exists": true,
+          "png_size_wh": [
+            1100,
+            1424
+          ],
+          "mode": "L",
+          "positive_pixels": 81304
+        },
+        "valid_mask": {
+          "path": "/mnt/data1/yy/home/yy/Projects/densekp_retrain/outputs/experiments/first_four_episodes_a1_20261011/e01/run/frame_000/cam2/valid_mask.png",
+          "exists": true,
+          "png_size_wh": [
+            1100,
+            1424
+          ],
+          "mode": "L",
+          "positive_pixels": 976786
+        },
+        "annotations": {
+          "path": "/mnt/data1/yy/home/yy/Projects/densekp_retrain/outputs/experiments/first_four_episodes_a1_20261011/e01/run/frame_000/cam2/annotations.npz",
+          "exists": true,
+          "png_size_wh": null
+        },
+        "raster_storage_ref": {
+          "path": "/mnt/data1/yy/home/yy/Projects/densekp_retrain/outputs/experiments/first_four_episodes_a1_20261011/e01/run/frame_000/cam2/raster_storage.json",
+          "exists": true,
+          "png_size_wh": null
+        },
+        "render_coverage_ref": {
+          "path": "/mnt/data1/yy/home/yy/Projects/densekp_retrain/outputs/experiments/first_four_episodes_a1_20261011/e01/run/frame_000/cam2/render_coverage.json",
+          "exists": true,
+          "png_size_wh": null
+        },
+        "physical_mask_ref": {
+          "path": "/mnt/data1/yy/home/yy/Projects/densekp_retrain/outputs/experiments/first_four_episodes_a1_20261011/e01/run/calibration/cam2_valid_mask.png",
+          "exists": true,
+          "png_size_wh": [
+            5760,
+            2880
+          ]
+        }
+      },
+      "annotations": {
+        "person_ids": {
+          "shape": [
+            1
+          ],
+          "dtype": "int64"
+        },
+        "xy": {
+          "shape": [
+            1,
+            138,
+            2
+          ],
+          "dtype": "float32"
+        },
+        "fisheye_xy": {
+          "shape": [
+            1,
+            138,
+            2
+          ],
+          "dtype": "float32"
+        },
+        "model_domain": {
+          "shape": [
+            1,
+            138
+          ],
+          "dtype": "bool"
+        },
+        "in_view": {
+          "shape": [
+            1,
+            138
+          ],
+          "dtype": "bool"
+        },
+        "surface_visible": {
+          "shape": [
+            1,
+            138
+          ],
+          "dtype": "bool"
+        },
+        "visible": {
+          "shape": [
+            1,
+            138
+          ],
+          "dtype": "bool"
+        },
+        "out_of_view": {
+          "shape": [
+            1,
+            138
+          ],
+          "dtype": "bool"
+        },
+        "occluded_in_view": {
+          "shape": [
+            1,
+            138
+          ],
+          "dtype": "bool"
+        },
+        "camera_to_world_erp": {
+          "shape": [
+            4,
+            4
+          ],
+          "dtype": "float64"
+        },
+        "world_densekp": {
+          "shape": [
+            1,
+            138,
+            3
+          ],
+          "dtype": "float64"
+        },
+        "occlusion_evidence_code": {
+          "shape": [
+            1,
+            138
+          ],
+          "dtype": "uint8"
+        },
+        "front_instance_id": {
+          "shape": [
+            1,
+            138
+          ],
+          "dtype": "int32"
+        },
+        "front_range_m": {
+          "shape": [
+            1,
+            138
+          ],
+          "dtype": "float32"
+        },
+        "gt_minus_front_range_m": {
+          "shape": [
+            1,
+            138
+          ],
+          "dtype": "float32"
+        },
+        "nearer_same_front_id_3x3_count": {
+          "shape": [
+            1,
+            138
+          ],
+          "dtype": "uint8"
+        },
+        "frame_index": {
+          "shape": [],
+          "dtype": "int64"
+        },
+        "time_tick": {
+          "shape": [],
+          "dtype": "int64"
+        },
+        "time_base": {
+          "shape": [
+            2
+          ],
+          "dtype": "int64"
+        },
+        "person_asset_frame": {
+          "shape": [
+            1
+          ],
+          "dtype": "int64"
+        },
+        "person_source_frame": {
+          "shape": [
+            1
+          ],
+          "dtype": "int64"
+        },
+        "person_source_time_tick": {
+          "shape": [
+            1
+          ],
+          "dtype": "int64"
+        },
+        "person_source_time_base": {
+          "shape": [
+            1,
+            2
+          ],
+          "dtype": "int64"
+        },
+        "person_quantization_error_seconds": {
+          "shape": [
+            1,
+            2
+          ],
+          "dtype": "int64"
+        }
+      },
+      "mamma_native_crop": {
+        "rect_xyxy": [
+          4066,
+          1222,
+          4608,
+          1942
+        ],
+        "roi_xyxy": [
+          3814,
+          868,
+          4914,
+          2292
+        ],
+        "status": "supported",
+        "box_xyxy": [
+          4227,
+          1285,
+          4447,
+          1879
+        ],
+        "gaussian_sigma": 0,
+        "sampling_margin_px": 3
+      },
+      "raster": {
+        "roi_xyxy": [
+          3814,
+          868,
+          4914,
+          2292
+        ],
+        "offset_xy": [
+          3814,
+          868
+        ],
+        "stored_size_wh": [
+          1100,
+          1424
+        ],
+        "render_coverage_xyxy": [
+          3814,
+          868,
+          4914,
+          2292
+        ],
+        "outside_stored_region": "unknown"
+      },
+      "scene_matrices": {
+        "path": "/mnt/data1/yy/home/yy/Projects/densekp_retrain/outputs/experiments/first_four_episodes_a1_20261011/e01/run/scene_matrices.npy",
+        "exists": true,
+        "shape": [
+          31,
+          1,
+          4,
+          4
+        ],
+        "selected_row": 0,
+        "person_index": 0
+      },
+      "source_asset": {
+        "path": "/mnt/data1/yy/home/yy/Projects/densekp_retrain/outputs/experiments/first_four_episodes_a1_20261011/e01/rider_adapter.json",
+        "exists": true,
+        "asset_id": "cycling_M02_v3_zenodo10668611_p1_alternate_9600_9696_simple_v1",
+        "body_vertices": "/mnt/data1/yy/home/yy/Projects/densekp_retrain/outputs/experiments/bvh_p1_smplx_pilot_a2_20261010/p1_alternate/fit_attempt_1/vertices.npy",
+        "body_faces": "/mnt/data1/yy/home/yy/Projects/densekp_retrain/outputs/experiments/bvh_p1_smplx_pilot_a2_20261010/p1_alternate/faces.npy",
+        "cloth_vertices": "/mnt/data1/yy/home/yy/Projects/densekp_retrain/outputs/experiments/bvh_p1_dressed_assets_a2_20261010/p1_alternate/full/clothing_vertices.npy",
+        "head_transforms": "/mnt/data1/yy/home/yy/Projects/densekp_retrain/outputs/experiments/bvh_p1_dressed_assets_a2_20261010/p1_alternate/full/head_transforms.npy",
+        "all_geometry_files_exist": true
+      }
+    },
+    {
+      "episode": "e01",
+      "rig": "rig_edge",
+      "observation_id": "f0_cam4_p1",
+      "status": "observed",
+      "reason": "",
+      "person_id": 1,
+      "camera_id": "cam4",
+      "frame_index": 0,
+      "source_frame_index": 9615,
+      "source_time_tick": 4006253205,
+      "source_time_base": [
+        1,
+        10000000
+      ],
+      "asset_frame_index": 15,
+      "source_ref": "/mnt/data1/yy/home/yy/Projects/densekp_retrain/outputs/experiments/first_four_episodes_a1_20261011/e01/rider_adapter.json",
+      "person_timeline_ref": "/mnt/data1/yy/home/yy/Projects/densekp_retrain/outputs/experiments/first_four_episodes_a1_20261011/e01/run/person1_timeline.json",
+      "scene_matrices_ref": "/mnt/data1/yy/home/yy/Projects/densekp_retrain/outputs/experiments/first_four_episodes_a1_20261011/e01/run/scene_matrices.npy",
+      "scene_matrix_row": 0,
+      "scene_matrix_person_index": 0,
+      "full_image_size_wh": [
+        5760,
+        2880
+      ],
+      "files": {
+        "image": {
+          "path": "/mnt/data1/yy/home/yy/Projects/densekp_retrain/outputs/experiments/first_four_episodes_a1_20261011/e01/run/frame_000/cam4/roi.png",
+          "exists": true,
+          "png_size_wh": [
+            1113,
+            1418
+          ],
+          "mode": "RGB"
+        },
+        "person_mask": {
+          "path": "/mnt/data1/yy/home/yy/Projects/densekp_retrain/outputs/experiments/first_four_episodes_a1_20261011/e01/run/frame_000/cam4/person_1_mask.png",
+          "exists": true,
+          "png_size_wh": [
+            1113,
+            1418
+          ],
+          "mode": "L",
+          "positive_pixels": 78823
+        },
+        "valid_mask": {
+          "path": "/mnt/data1/yy/home/yy/Projects/densekp_retrain/outputs/experiments/first_four_episodes_a1_20261011/e01/run/frame_000/cam4/valid_mask.png",
+          "exists": true,
+          "png_size_wh": [
+            1113,
+            1418
+          ],
+          "mode": "L",
+          "positive_pixels": 979472
+        },
+        "annotations": {
+          "path": "/mnt/data1/yy/home/yy/Projects/densekp_retrain/outputs/experiments/first_four_episodes_a1_20261011/e01/run/frame_000/cam4/annotations.npz",
+          "exists": true,
+          "png_size_wh": null
+        },
+        "raster_storage_ref": {
+          "path": "/mnt/data1/yy/home/yy/Projects/densekp_retrain/outputs/experiments/first_four_episodes_a1_20261011/e01/run/frame_000/cam4/raster_storage.json",
+          "exists": true,
+          "png_size_wh": null
+        },
+        "render_coverage_ref": {
+          "path": "/mnt/data1/yy/home/yy/Projects/densekp_retrain/outputs/experiments/first_four_episodes_a1_20261011/e01/run/frame_000/cam4/render_coverage.json",
+          "exists": true,
+          "png_size_wh": null
+        },
+        "physical_mask_ref": {
+          "path": "/mnt/data1/yy/home/yy/Projects/densekp_retrain/outputs/experiments/first_four_episodes_a1_20261011/e01/run/calibration/cam4_valid_mask.png",
+          "exists": true,
+          "png_size_wh": [
+            5760,
+            2880
+          ]
+        }
+      },
+      "annotations": {
+        "person_ids": {
+          "shape": [
+            1
+          ],
+          "dtype": "int64"
+        },
+        "xy": {
+          "shape": [
+            1,
+            138,
+            2
+          ],
+          "dtype": "float32"
+        },
+        "fisheye_xy": {
+          "shape": [
+            1,
+            138,
+            2
+          ],
+          "dtype": "float32"
+        },
+        "model_domain": {
+          "shape": [
+            1,
+            138
+          ],
+          "dtype": "bool"
+        },
+        "in_view": {
+          "shape": [
+            1,
+            138
+          ],
+          "dtype": "bool"
+        },
+        "surface_visible": {
+          "shape": [
+            1,
+            138
+          ],
+          "dtype": "bool"
+        },
+        "visible": {
+          "shape": [
+            1,
+            138
+          ],
+          "dtype": "bool"
+        },
+        "out_of_view": {
+          "shape": [
+            1,
+            138
+          ],
+          "dtype": "bool"
+        },
+        "occluded_in_view": {
+          "shape": [
+            1,
+            138
+          ],
+          "dtype": "bool"
+        },
+        "camera_to_world_erp": {
+          "shape": [
+            4,
+            4
+          ],
+          "dtype": "float64"
+        },
+        "world_densekp": {
+          "shape": [
+            1,
+            138,
+            3
+          ],
+          "dtype": "float64"
+        },
+        "occlusion_evidence_code": {
+          "shape": [
+            1,
+            138
+          ],
+          "dtype": "uint8"
+        },
+        "front_instance_id": {
+          "shape": [
+            1,
+            138
+          ],
+          "dtype": "int32"
+        },
+        "front_range_m": {
+          "shape": [
+            1,
+            138
+          ],
+          "dtype": "float32"
+        },
+        "gt_minus_front_range_m": {
+          "shape": [
+            1,
+            138
+          ],
+          "dtype": "float32"
+        },
+        "nearer_same_front_id_3x3_count": {
+          "shape": [
+            1,
+            138
+          ],
+          "dtype": "uint8"
+        },
+        "frame_index": {
+          "shape": [],
+          "dtype": "int64"
+        },
+        "time_tick": {
+          "shape": [],
+          "dtype": "int64"
+        },
+        "time_base": {
+          "shape": [
+            2
+          ],
+          "dtype": "int64"
+        },
+        "person_asset_frame": {
+          "shape": [
+            1
+          ],
+          "dtype": "int64"
+        },
+        "person_source_frame": {
+          "shape": [
+            1
+          ],
+          "dtype": "int64"
+        },
+        "person_source_time_tick": {
+          "shape": [
+            1
+          ],
+          "dtype": "int64"
+        },
+        "person_source_time_base": {
+          "shape": [
+            1,
+            2
+          ],
+          "dtype": "int64"
+        },
+        "person_quantization_error_seconds": {
+          "shape": [
+            1,
+            2
+          ],
+          "dtype": "int64"
+        }
+      },
+      "mamma_native_crop": {
+        "rect_xyxy": [
+          4035,
+          1224,
+          4572,
+          1937
+        ],
+        "roi_xyxy": [
+          3725,
+          869,
+          4838,
+          2287
+        ],
+        "status": "supported",
+        "box_xyxy": [
+          4181,
+          1286,
+          4426,
+          1875
+        ],
+        "gaussian_sigma": 0,
+        "sampling_margin_px": 3
+      },
+      "raster": {
+        "roi_xyxy": [
+          3725,
+          869,
+          4838,
+          2287
+        ],
+        "offset_xy": [
+          3725,
+          869
+        ],
+        "stored_size_wh": [
+          1113,
+          1418
+        ],
+        "render_coverage_xyxy": [
+          3725,
+          869,
+          4838,
+          2287
+        ],
+        "outside_stored_region": "unknown"
+      },
+      "scene_matrices": {
+        "path": "/mnt/data1/yy/home/yy/Projects/densekp_retrain/outputs/experiments/first_four_episodes_a1_20261011/e01/run/scene_matrices.npy",
+        "exists": true,
+        "shape": [
+          31,
+          1,
+          4,
+          4
+        ],
+        "selected_row": 0,
+        "person_index": 0
+      },
+      "source_asset": {
+        "path": "/mnt/data1/yy/home/yy/Projects/densekp_retrain/outputs/experiments/first_four_episodes_a1_20261011/e01/rider_adapter.json",
+        "exists": true,
+        "asset_id": "cycling_M02_v3_zenodo10668611_p1_alternate_9600_9696_simple_v1",
+        "body_vertices": "/mnt/data1/yy/home/yy/Projects/densekp_retrain/outputs/experiments/bvh_p1_smplx_pilot_a2_20261010/p1_alternate/fit_attempt_1/vertices.npy",
+        "body_faces": "/mnt/data1/yy/home/yy/Projects/densekp_retrain/outputs/experiments/bvh_p1_smplx_pilot_a2_20261010/p1_alternate/faces.npy",
+        "cloth_vertices": "/mnt/data1/yy/home/yy/Projects/densekp_retrain/outputs/experiments/bvh_p1_dressed_assets_a2_20261010/p1_alternate/full/clothing_vertices.npy",
+        "head_transforms": "/mnt/data1/yy/home/yy/Projects/densekp_retrain/outputs/experiments/bvh_p1_dressed_assets_a2_20261010/p1_alternate/full/head_transforms.npy",
+        "all_geometry_files_exist": true
+      }
+    },
+    {
+      "episode": "e02",
+      "rig": "rig_front",
+      "observation_id": "f0_cam2_p2",
+      "status": "observed",
+      "reason": "",
+      "person_id": 2,
+      "camera_id": "cam2",
+      "frame_index": 0,
+      "source_frame_index": 10,
+      "source_time_tick": 10,
+      "source_time_base": [
+        1,
+        30
+      ],
+      "asset_frame_index": 1,
+      "source_ref": "/mnt/data1/yy/home/yy/Projects/densekp_retrain/outputs/experiments/walking_composition_a2_20261010/builds/M04_KIT425_walk_replay_v2/a1_walking_view.json",
+      "person_timeline_ref": "/mnt/data1/yy/home/yy/Projects/densekp_retrain/outputs/experiments/first_four_episodes_a1_20261011/e02/run/rigs/rig_front/person2_timeline.json",
+      "scene_matrices_ref": "/mnt/data1/yy/home/yy/Projects/densekp_retrain/outputs/experiments/first_four_episodes_a1_20261011/e02/run/rigs/rig_front/scene_matrices.npy",
+      "scene_matrix_row": 0,
+      "scene_matrix_person_index": 1,
+      "full_image_size_wh": [
+        5760,
+        2880
+      ],
+      "files": {
+        "image": {
+          "path": "/mnt/data1/yy/home/yy/Projects/densekp_retrain/outputs/experiments/first_four_episodes_a1_20261011/e02/run/rigs/rig_front/frame_000/cam2/roi.png",
+          "exists": true,
+          "png_size_wh": [
+            1008,
+            1154
+          ],
+          "mode": "RGB"
+        },
+        "person_mask": {
+          "path": "/mnt/data1/yy/home/yy/Projects/densekp_retrain/outputs/experiments/first_four_episodes_a1_20261011/e02/run/rigs/rig_front/frame_000/cam2/person_2_mask.png",
+          "exists": true,
+          "png_size_wh": [
+            1008,
+            1154
+          ],
+          "mode": "L",
+          "positive_pixels": 13563
+        },
+        "valid_mask": {
+          "path": "/mnt/data1/yy/home/yy/Projects/densekp_retrain/outputs/experiments/first_four_episodes_a1_20261011/e02/run/rigs/rig_front/frame_000/cam2/valid_mask.png",
+          "exists": true,
+          "png_size_wh": [
+            1008,
+            1154
+          ],
+          "mode": "L",
+          "positive_pixels": 999721
+        },
+        "annotations": {
+          "path": "/mnt/data1/yy/home/yy/Projects/densekp_retrain/outputs/experiments/first_four_episodes_a1_20261011/e02/run/rigs/rig_front/frame_000/cam2/annotations.npz",
+          "exists": true,
+          "png_size_wh": null
+        },
+        "raster_storage_ref": {
+          "path": "/mnt/data1/yy/home/yy/Projects/densekp_retrain/outputs/experiments/first_four_episodes_a1_20261011/e02/run/rigs/rig_front/frame_000/cam2/raster_storage.json",
+          "exists": true,
+          "png_size_wh": null
+        },
+        "render_coverage_ref": {
+          "path": "/mnt/data1/yy/home/yy/Projects/densekp_retrain/outputs/experiments/first_four_episodes_a1_20261011/e02/run/rigs/rig_front/frame_000/cam2/render_coverage.json",
+          "exists": true,
+          "png_size_wh": null
+        },
+        "physical_mask_ref": {
+          "path": "/mnt/data1/yy/home/yy/Projects/densekp_retrain/outputs/experiments/first_four_episodes_a1_20261011/e02/run/rigs/rig_front/calibration/cam2_valid_mask.png",
+          "exists": true,
+          "png_size_wh": [
+            5760,
+            2880
+          ]
+        }
+      },
+      "annotations": {
+        "person_ids": {
+          "shape": [
+            2
+          ],
+          "dtype": "int64"
+        },
+        "xy": {
+          "shape": [
+            2,
+            138,
+            2
+          ],
+          "dtype": "float32"
+        },
+        "fisheye_xy": {
+          "shape": [
+            2,
+            138,
+            2
+          ],
+          "dtype": "float32"
+        },
+        "model_domain": {
+          "shape": [
+            2,
+            138
+          ],
+          "dtype": "bool"
+        },
+        "in_view": {
+          "shape": [
+            2,
+            138
+          ],
+          "dtype": "bool"
+        },
+        "surface_visible": {
+          "shape": [
+            2,
+            138
+          ],
+          "dtype": "bool"
+        },
+        "visible": {
+          "shape": [
+            2,
+            138
+          ],
+          "dtype": "bool"
+        },
+        "out_of_view": {
+          "shape": [
+            2,
+            138
+          ],
+          "dtype": "bool"
+        },
+        "occluded_in_view": {
+          "shape": [
+            2,
+            138
+          ],
+          "dtype": "bool"
+        },
+        "camera_to_world_erp": {
+          "shape": [
+            4,
+            4
+          ],
+          "dtype": "float64"
+        },
+        "world_densekp": {
+          "shape": [
+            2,
+            138,
+            3
+          ],
+          "dtype": "float64"
+        },
+        "scene_episode_id": {
+          "shape": [],
+          "dtype": "<U39"
+        },
+        "rig_id": {
+          "shape": [],
+          "dtype": "<U9"
+        },
+        "occlusion_evidence_code": {
+          "shape": [
+            2,
+            138
+          ],
+          "dtype": "uint8"
+        },
+        "front_instance_id": {
+          "shape": [
+            2,
+            138
+          ],
+          "dtype": "int32"
+        },
+        "front_range_m": {
+          "shape": [
+            2,
+            138
+          ],
+          "dtype": "float32"
+        },
+        "gt_minus_front_range_m": {
+          "shape": [
+            2,
+            138
+          ],
+          "dtype": "float32"
+        },
+        "nearer_same_front_id_3x3_count": {
+          "shape": [
+            2,
+            138
+          ],
+          "dtype": "uint8"
+        },
+        "frame_index": {
+          "shape": [],
+          "dtype": "int64"
+        },
+        "time_tick": {
+          "shape": [],
+          "dtype": "int64"
+        },
+        "time_base": {
+          "shape": [
+            2
+          ],
+          "dtype": "int64"
+        },
+        "person_asset_frame": {
+          "shape": [
+            2
+          ],
+          "dtype": "int64"
+        },
+        "person_source_frame": {
+          "shape": [
+            2
+          ],
+          "dtype": "int64"
+        },
+        "person_source_time_tick": {
+          "shape": [
+            2
+          ],
+          "dtype": "int64"
+        },
+        "person_source_time_base": {
+          "shape": [
+            2,
+            2
+          ],
+          "dtype": "int64"
+        },
+        "person_quantization_error_seconds": {
+          "shape": [
+            2,
+            2
+          ],
+          "dtype": "int64"
+        }
+      },
+      "mamma_native_crop": {
+        "rect_xyxy": [
+          1706,
+          1297,
+          1983,
+          1662
+        ],
+        "roi_xyxy": [
+          1118,
+          909,
+          2126,
+          2063
+        ],
+        "status": "supported",
+        "box_xyxy": [
+          1790,
+          1330,
+          1899,
+          1629
+        ],
+        "gaussian_sigma": 0,
+        "sampling_margin_px": 3
+      },
+      "raster": {
+        "roi_xyxy": [
+          1118,
+          909,
+          2126,
+          2063
+        ],
+        "offset_xy": [
+          1118,
+          909
+        ],
+        "stored_size_wh": [
+          1008,
+          1154
+        ],
+        "render_coverage_xyxy": [
+          1118,
+          909,
+          2126,
+          2063
+        ],
+        "outside_stored_region": "unknown"
+      },
+      "scene_matrices": {
+        "path": "/mnt/data1/yy/home/yy/Projects/densekp_retrain/outputs/experiments/first_four_episodes_a1_20261011/e02/run/rigs/rig_front/scene_matrices.npy",
+        "exists": true,
+        "shape": [
+          31,
+          2,
+          4,
+          4
+        ],
+        "selected_row": 0,
+        "person_index": 1
+      },
+      "source_asset": {
+        "path": "/mnt/data1/yy/home/yy/Projects/densekp_retrain/outputs/experiments/walking_composition_a2_20261010/builds/M04_KIT425_walk_replay_v2/a1_walking_view.json",
+        "exists": true,
+        "asset_id": "compose_M04_KIT425_walk_replay_v2_M04_KIT425_walk",
+        "body_vertices": "/mnt/data1/yy/home/yy/Projects/densekp_retrain/outputs/experiments/walking_composition_a2_20261010/cache/body/M04__KIT425_walk__0_94/vertices.npy",
+        "body_faces": "/mnt/data1/yy/home/yy/Projects/densekp_retrain/outputs/experiments/walking_composition_a2_20261010/cache/body/M04__KIT425_walk__0_94/faces.npy",
+        "cloth_vertices": "/mnt/data1/yy/home/yy/Projects/densekp_retrain/outputs/experiments/walking_composition_a2_20261010/cache/cloth_motion/M04__KIT425_walk__0_94__M04_simple/clothing_vertices.npy",
+        "head_transforms": "/mnt/data1/yy/home/yy/Projects/densekp_retrain/outputs/experiments/walking_composition_a2_20261010/cache/body/M04__KIT425_walk__0_94/head_transforms.npy",
+        "all_geometry_files_exist": true
+      }
+    },
+    {
+      "episode": "e02",
+      "rig": "rig_front",
+      "observation_id": "f0_cam4_p2",
+      "status": "person_absent",
+      "reason": "outside_physical_domain_no_instance_box",
+      "person_id": 2,
+      "camera_id": "cam4",
+      "frame_index": 0,
+      "source_frame_index": 10,
+      "source_time_tick": 10,
+      "source_time_base": [
+        1,
+        30
+      ],
+      "asset_frame_index": 1,
+      "source_ref": "/mnt/data1/yy/home/yy/Projects/densekp_retrain/outputs/experiments/walking_composition_a2_20261010/builds/M04_KIT425_walk_replay_v2/a1_walking_view.json",
+      "person_timeline_ref": "/mnt/data1/yy/home/yy/Projects/densekp_retrain/outputs/experiments/first_four_episodes_a1_20261011/e02/run/rigs/rig_front/person2_timeline.json",
+      "scene_matrices_ref": "/mnt/data1/yy/home/yy/Projects/densekp_retrain/outputs/experiments/first_four_episodes_a1_20261011/e02/run/rigs/rig_front/scene_matrices.npy",
+      "scene_matrix_row": 0,
+      "scene_matrix_person_index": 1,
+      "full_image_size_wh": [
+        5760,
+        2880
+      ],
+      "files": {
+        "image": {
+          "path": "/mnt/data1/yy/home/yy/Projects/densekp_retrain/outputs/experiments/first_four_episodes_a1_20261011/e02/run/rigs/rig_front/frame_000/cam4/roi.png",
+          "exists": true,
+          "png_size_wh": [
+            968,
+            1147
+          ],
+          "mode": "RGB"
+        },
+        "person_mask": {
+          "path": null,
+          "exists": false,
+          "png_size_wh": null
+        },
+        "valid_mask": {
+          "path": "/mnt/data1/yy/home/yy/Projects/densekp_retrain/outputs/experiments/first_four_episodes_a1_20261011/e02/run/rigs/rig_front/frame_000/cam4/valid_mask.png",
+          "exists": true,
+          "png_size_wh": [
+            968,
+            1147
+          ],
+          "mode": "L",
+          "positive_pixels": 489923
+        },
+        "annotations": {
+          "path": "/mnt/data1/yy/home/yy/Projects/densekp_retrain/outputs/experiments/first_four_episodes_a1_20261011/e02/run/rigs/rig_front/frame_000/cam4/annotations.npz",
+          "exists": true,
+          "png_size_wh": null
+        },
+        "raster_storage_ref": {
+          "path": "/mnt/data1/yy/home/yy/Projects/densekp_retrain/outputs/experiments/first_four_episodes_a1_20261011/e02/run/rigs/rig_front/frame_000/cam4/raster_storage.json",
+          "exists": true,
+          "png_size_wh": null
+        },
+        "render_coverage_ref": {
+          "path": "/mnt/data1/yy/home/yy/Projects/densekp_retrain/outputs/experiments/first_four_episodes_a1_20261011/e02/run/rigs/rig_front/frame_000/cam4/render_coverage.json",
+          "exists": true,
+          "png_size_wh": null
+        },
+        "physical_mask_ref": {
+          "path": "/mnt/data1/yy/home/yy/Projects/densekp_retrain/outputs/experiments/first_four_episodes_a1_20261011/e02/run/rigs/rig_front/calibration/cam4_valid_mask.png",
+          "exists": true,
+          "png_size_wh": [
+            5760,
+            2880
+          ]
+        }
+      },
+      "annotations": {
+        "person_ids": {
+          "shape": [
+            2
+          ],
+          "dtype": "int64"
+        },
+        "xy": {
+          "shape": [
+            2,
+            138,
+            2
+          ],
+          "dtype": "float32"
+        },
+        "fisheye_xy": {
+          "shape": [
+            2,
+            138,
+            2
+          ],
+          "dtype": "float32"
+        },
+        "model_domain": {
+          "shape": [
+            2,
+            138
+          ],
+          "dtype": "bool"
+        },
+        "in_view": {
+          "shape": [
+            2,
+            138
+          ],
+          "dtype": "bool"
+        },
+        "surface_visible": {
+          "shape": [
+            2,
+            138
+          ],
+          "dtype": "bool"
+        },
+        "visible": {
+          "shape": [
+            2,
+            138
+          ],
+          "dtype": "bool"
+        },
+        "out_of_view": {
+          "shape": [
+            2,
+            138
+          ],
+          "dtype": "bool"
+        },
+        "occluded_in_view": {
+          "shape": [
+            2,
+            138
+          ],
+          "dtype": "bool"
+        },
+        "camera_to_world_erp": {
+          "shape": [
+            4,
+            4
+          ],
+          "dtype": "float64"
+        },
+        "world_densekp": {
+          "shape": [
+            2,
+            138,
+            3
+          ],
+          "dtype": "float64"
+        },
+        "scene_episode_id": {
+          "shape": [],
+          "dtype": "<U39"
+        },
+        "rig_id": {
+          "shape": [],
+          "dtype": "<U9"
+        },
+        "occlusion_evidence_code": {
+          "shape": [
+            2,
+            138
+          ],
+          "dtype": "uint8"
+        },
+        "front_instance_id": {
+          "shape": [
+            2,
+            138
+          ],
+          "dtype": "int32"
+        },
+        "front_range_m": {
+          "shape": [
+            2,
+            138
+          ],
+          "dtype": "float32"
+        },
+        "gt_minus_front_range_m": {
+          "shape": [
+            2,
+            138
+          ],
+          "dtype": "float32"
+        },
+        "nearer_same_front_id_3x3_count": {
+          "shape": [
+            2,
+            138
+          ],
+          "dtype": "uint8"
+        },
+        "frame_index": {
+          "shape": [],
+          "dtype": "int64"
+        },
+        "time_tick": {
+          "shape": [],
+          "dtype": "int64"
+        },
+        "time_base": {
+          "shape": [
+            2
+          ],
+          "dtype": "int64"
+        },
+        "person_asset_frame": {
+          "shape": [
+            2
+          ],
+          "dtype": "int64"
+        },
+        "person_source_frame": {
+          "shape": [
+            2
+          ],
+          "dtype": "int64"
+        },
+        "person_source_time_tick": {
+          "shape": [
+            2
+          ],
+          "dtype": "int64"
+        },
+        "person_source_time_base": {
+          "shape": [
+            2,
+            2
+          ],
+          "dtype": "int64"
+        },
+        "person_quantization_error_seconds": {
+          "shape": [
+            2,
+            2
+          ],
+          "dtype": "int64"
+        }
+      },
+      "mamma_native_crop": null,
+      "raster": {
+        "roi_xyxy": [
+          1181,
+          912,
+          2149,
+          2059
+        ],
+        "offset_xy": [
+          1181,
+          912
+        ],
+        "stored_size_wh": [
+          968,
+          1147
+        ],
+        "render_coverage_xyxy": [
+          1181,
+          912,
+          2149,
+          2059
+        ],
+        "outside_stored_region": "unknown"
+      },
+      "scene_matrices": {
+        "path": "/mnt/data1/yy/home/yy/Projects/densekp_retrain/outputs/experiments/first_four_episodes_a1_20261011/e02/run/rigs/rig_front/scene_matrices.npy",
+        "exists": true,
+        "shape": [
+          31,
+          2,
+          4,
+          4
+        ],
+        "selected_row": 0,
+        "person_index": 1
+      },
+      "source_asset": {
+        "path": "/mnt/data1/yy/home/yy/Projects/densekp_retrain/outputs/experiments/walking_composition_a2_20261010/builds/M04_KIT425_walk_replay_v2/a1_walking_view.json",
+        "exists": true,
+        "asset_id": "compose_M04_KIT425_walk_replay_v2_M04_KIT425_walk",
+        "body_vertices": "/mnt/data1/yy/home/yy/Projects/densekp_retrain/outputs/experiments/walking_composition_a2_20261010/cache/body/M04__KIT425_walk__0_94/vertices.npy",
+        "body_faces": "/mnt/data1/yy/home/yy/Projects/densekp_retrain/outputs/experiments/walking_composition_a2_20261010/cache/body/M04__KIT425_walk__0_94/faces.npy",
+        "cloth_vertices": "/mnt/data1/yy/home/yy/Projects/densekp_retrain/outputs/experiments/walking_composition_a2_20261010/cache/cloth_motion/M04__KIT425_walk__0_94__M04_simple/clothing_vertices.npy",
+        "head_transforms": "/mnt/data1/yy/home/yy/Projects/densekp_retrain/outputs/experiments/walking_composition_a2_20261010/cache/body/M04__KIT425_walk__0_94/head_transforms.npy",
+        "all_geometry_files_exist": true
+      }
+    },
+    {
+      "episode": "e03",
+      "rig": "rig_back",
+      "observation_id": "f15_cam2_p2",
+      "status": "observed",
+      "reason": "",
+      "person_id": 2,
+      "camera_id": "cam2",
+      "frame_index": 15,
+      "source_frame_index": 54,
+      "source_time_tick": 54,
+      "source_time_base": [
+        1,
+        30
+      ],
+      "asset_frame_index": 54,
+      "source_ref": "/mnt/data1/yy/home/yy/Projects/densekp_retrain/outputs/experiments/walking_composition_a2_20261010/builds/M03_KIT11_walk/a1_walking_view.json",
+      "person_timeline_ref": "/mnt/data1/yy/home/yy/Projects/densekp_retrain/outputs/experiments/first_four_episodes_a1_20261011/e03/run/rigs/rig_back/person2_timeline.json",
+      "scene_matrices_ref": "/mnt/data1/yy/home/yy/Projects/densekp_retrain/outputs/experiments/first_four_episodes_a1_20261011/e03/run/rigs/rig_back/scene_matrices.npy",
+      "scene_matrix_row": 15,
+      "scene_matrix_person_index": 1,
+      "full_image_size_wh": [
+        5760,
+        2880
+      ],
+      "files": {
+        "image": {
+          "path": "/mnt/data1/yy/home/yy/Projects/densekp_retrain/outputs/experiments/first_four_episodes_a1_20261011/e03/run/rigs/rig_back/frame_015/cam2/roi.png",
+          "exists": true,
+          "png_size_wh": [
+            1537,
+            2034
+          ],
+          "mode": "RGB"
+        },
+        "person_mask": {
+          "path": "/mnt/data1/yy/home/yy/Projects/densekp_retrain/outputs/experiments/first_four_episodes_a1_20261011/e03/run/rigs/rig_back/frame_015/cam2/person_2_mask.png",
+          "exists": true,
+          "png_size_wh": [
+            1537,
+            2034
+          ],
+          "mode": "L",
+          "positive_pixels": 133897
+        },
+        "valid_mask": {
+          "path": "/mnt/data1/yy/home/yy/Projects/densekp_retrain/outputs/experiments/first_four_episodes_a1_20261011/e03/run/rigs/rig_back/frame_015/cam2/valid_mask.png",
+          "exists": true,
+          "png_size_wh": [
+            1537,
+            2034
+          ],
+          "mode": "L",
+          "positive_pixels": 3027159
+        },
+        "annotations": {
+          "path": "/mnt/data1/yy/home/yy/Projects/densekp_retrain/outputs/experiments/first_four_episodes_a1_20261011/e03/run/rigs/rig_back/frame_015/cam2/annotations.npz",
+          "exists": true,
+          "png_size_wh": null
+        },
+        "raster_storage_ref": {
+          "path": "/mnt/data1/yy/home/yy/Projects/densekp_retrain/outputs/experiments/first_four_episodes_a1_20261011/e03/run/rigs/rig_back/frame_015/cam2/raster_storage.json",
+          "exists": true,
+          "png_size_wh": null
+        },
+        "render_coverage_ref": {
+          "path": "/mnt/data1/yy/home/yy/Projects/densekp_retrain/outputs/experiments/first_four_episodes_a1_20261011/e03/run/rigs/rig_back/frame_015/cam2/render_coverage.json",
+          "exists": true,
+          "png_size_wh": null
+        },
+        "physical_mask_ref": {
+          "path": "/mnt/data1/yy/home/yy/Projects/densekp_retrain/outputs/experiments/first_four_episodes_a1_20261011/e03/run/rigs/rig_back/calibration/cam2_valid_mask.png",
+          "exists": true,
+          "png_size_wh": [
+            5760,
+            2880
+          ]
+        }
+      },
+      "annotations": {
+        "person_ids": {
+          "shape": [
+            2
+          ],
+          "dtype": "int64"
+        },
+        "xy": {
+          "shape": [
+            2,
+            138,
+            2
+          ],
+          "dtype": "float32"
+        },
+        "fisheye_xy": {
+          "shape": [
+            2,
+            138,
+            2
+          ],
+          "dtype": "float32"
+        },
+        "model_domain": {
+          "shape": [
+            2,
+            138
+          ],
+          "dtype": "bool"
+        },
+        "in_view": {
+          "shape": [
+            2,
+            138
+          ],
+          "dtype": "bool"
+        },
+        "surface_visible": {
+          "shape": [
+            2,
+            138
+          ],
+          "dtype": "bool"
+        },
+        "visible": {
+          "shape": [
+            2,
+            138
+          ],
+          "dtype": "bool"
+        },
+        "out_of_view": {
+          "shape": [
+            2,
+            138
+          ],
+          "dtype": "bool"
+        },
+        "occluded_in_view": {
+          "shape": [
+            2,
+            138
+          ],
+          "dtype": "bool"
+        },
+        "camera_to_world_erp": {
+          "shape": [
+            4,
+            4
+          ],
+          "dtype": "float64"
+        },
+        "world_densekp": {
+          "shape": [
+            2,
+            138,
+            3
+          ],
+          "dtype": "float64"
+        },
+        "scene_episode_id": {
+          "shape": [],
+          "dtype": "<U39"
+        },
+        "rig_id": {
+          "shape": [],
+          "dtype": "<U8"
+        },
+        "occlusion_evidence_code": {
+          "shape": [
+            2,
+            138
+          ],
+          "dtype": "uint8"
+        },
+        "front_instance_id": {
+          "shape": [
+            2,
+            138
+          ],
+          "dtype": "int32"
+        },
+        "front_range_m": {
+          "shape": [
+            2,
+            138
+          ],
+          "dtype": "float32"
+        },
+        "gt_minus_front_range_m": {
+          "shape": [
+            2,
+            138
+          ],
+          "dtype": "float32"
+        },
+        "nearer_same_front_id_3x3_count": {
+          "shape": [
+            2,
+            138
+          ],
+          "dtype": "uint8"
+        },
+        "frame_index": {
+          "shape": [],
+          "dtype": "int64"
+        },
+        "time_tick": {
+          "shape": [],
+          "dtype": "int64"
+        },
+        "time_base": {
+          "shape": [
+            2
+          ],
+          "dtype": "int64"
+        },
+        "person_asset_frame": {
+          "shape": [
+            2
+          ],
+          "dtype": "int64"
+        },
+        "person_source_frame": {
+          "shape": [
+            2
+          ],
+          "dtype": "int64"
+        },
+        "person_source_time_tick": {
+          "shape": [
+            2
+          ],
+          "dtype": "int64"
+        },
+        "person_source_time_base": {
+          "shape": [
+            2,
+            2
+          ],
+          "dtype": "int64"
+        },
+        "person_quantization_error_seconds": {
+          "shape": [
+            2,
+            2
+          ],
+          "dtype": "int64"
+        }
+      },
+      "mamma_native_crop": {
+        "rect_xyxy": [
+          3401,
+          1062,
+          4192,
+          2112
+        ],
+        "roi_xyxy": [
+          3030,
+          570,
+          4567,
+          2604
+        ],
+        "status": "supported",
+        "box_xyxy": [
+          3614,
+          1153,
+          3979,
+          2021
+        ],
+        "gaussian_sigma": 0.17812,
+        "sampling_margin_px": 4
+      },
+      "raster": {
+        "roi_xyxy": [
+          3030,
+          570,
+          4567,
+          2604
+        ],
+        "offset_xy": [
+          3030,
+          570
+        ],
+        "stored_size_wh": [
+          1537,
+          2034
+        ],
+        "render_coverage_xyxy": [
+          3030,
+          570,
+          4567,
+          2604
+        ],
+        "outside_stored_region": "unknown"
+      },
+      "scene_matrices": {
+        "path": "/mnt/data1/yy/home/yy/Projects/densekp_retrain/outputs/experiments/first_four_episodes_a1_20261011/e03/run/rigs/rig_back/scene_matrices.npy",
+        "exists": true,
+        "shape": [
+          31,
+          2,
+          4,
+          4
+        ],
+        "selected_row": 15,
+        "person_index": 1
+      },
+      "source_asset": {
+        "path": "/mnt/data1/yy/home/yy/Projects/densekp_retrain/outputs/experiments/walking_composition_a2_20261010/builds/M03_KIT11_walk/a1_walking_view.json",
+        "exists": true,
+        "asset_id": "compose_M03_KIT11_walk_M03_KIT11_walk",
+        "body_vertices": "/mnt/data1/yy/home/yy/Projects/densekp_retrain/outputs/experiments/walking_composition_a2_20261010/cache/body/M03__KIT11_walk__0_120/vertices.npy",
+        "body_faces": "/mnt/data1/yy/home/yy/Projects/densekp_retrain/outputs/experiments/walking_composition_a2_20261010/cache/body/M03__KIT11_walk__0_120/faces.npy",
+        "cloth_vertices": "/mnt/data1/yy/home/yy/Projects/densekp_retrain/outputs/experiments/walking_composition_a2_20261010/cache/cloth_motion/M03__KIT11_walk__0_120__M03_simple/clothing_vertices.npy",
+        "head_transforms": "/mnt/data1/yy/home/yy/Projects/densekp_retrain/outputs/experiments/walking_composition_a2_20261010/cache/body/M03__KIT11_walk__0_120/head_transforms.npy",
+        "all_geometry_files_exist": true
+      }
+    },
+    {
+      "episode": "e03",
+      "rig": "rig_front",
+      "observation_id": "f15_cam4_p1",
+      "status": "observed",
+      "reason": "",
+      "person_id": 1,
+      "camera_id": "cam4",
+      "frame_index": 15,
+      "source_frame_index": 9644,
+      "source_time_tick": 4018336548,
+      "source_time_base": [
+        1,
+        10000000
+      ],
+      "asset_frame_index": 44,
+      "source_ref": "/mnt/data1/yy/home/yy/Projects/densekp_retrain/outputs/experiments/first_four_episodes_a1_20261011/e03/rider_adapter.json",
+      "person_timeline_ref": "/mnt/data1/yy/home/yy/Projects/densekp_retrain/outputs/experiments/first_four_episodes_a1_20261011/e03/run/rigs/rig_front/person1_timeline.json",
+      "scene_matrices_ref": "/mnt/data1/yy/home/yy/Projects/densekp_retrain/outputs/experiments/first_four_episodes_a1_20261011/e03/run/rigs/rig_front/scene_matrices.npy",
+      "scene_matrix_row": 15,
+      "scene_matrix_person_index": 0,
+      "full_image_size_wh": [
+        5760,
+        2880
+      ],
+      "files": {
+        "image": {
+          "path": "/mnt/data1/yy/home/yy/Projects/densekp_retrain/outputs/experiments/first_four_episodes_a1_20261011/e03/run/rigs/rig_front/frame_015/cam4/roi.png",
+          "exists": true,
+          "png_size_wh": [
+            1062,
+            1351
+          ],
+          "mode": "RGB"
+        },
+        "person_mask": {
+          "path": "/mnt/data1/yy/home/yy/Projects/densekp_retrain/outputs/experiments/first_four_episodes_a1_20261011/e03/run/rigs/rig_front/frame_015/cam4/person_1_mask.png",
+          "exists": true,
+          "png_size_wh": [
+            1062,
+            1351
+          ],
+          "mode": "L",
+          "positive_pixels": 32448
+        },
+        "valid_mask": {
+          "path": "/mnt/data1/yy/home/yy/Projects/densekp_retrain/outputs/experiments/first_four_episodes_a1_20261011/e03/run/rigs/rig_front/frame_015/cam4/valid_mask.png",
+          "exists": true,
+          "png_size_wh": [
+            1062,
+            1351
+          ],
+          "mode": "L",
+          "positive_pixels": 771238
+        },
+        "annotations": {
+          "path": "/mnt/data1/yy/home/yy/Projects/densekp_retrain/outputs/experiments/first_four_episodes_a1_20261011/e03/run/rigs/rig_front/frame_015/cam4/annotations.npz",
+          "exists": true,
+          "png_size_wh": null
+        },
+        "raster_storage_ref": {
+          "path": "/mnt/data1/yy/home/yy/Projects/densekp_retrain/outputs/experiments/first_four_episodes_a1_20261011/e03/run/rigs/rig_front/frame_015/cam4/raster_storage.json",
+          "exists": true,
+          "png_size_wh": null
+        },
+        "render_coverage_ref": {
+          "path": "/mnt/data1/yy/home/yy/Projects/densekp_retrain/outputs/experiments/first_four_episodes_a1_20261011/e03/run/rigs/rig_front/frame_015/cam4/render_coverage.json",
+          "exists": true,
+          "png_size_wh": null
+        },
+        "physical_mask_ref": {
+          "path": "/mnt/data1/yy/home/yy/Projects/densekp_retrain/outputs/experiments/first_four_episodes_a1_20261011/e03/run/rigs/rig_front/calibration/cam4_valid_mask.png",
+          "exists": true,
+          "png_size_wh": [
+            5760,
+            2880
+          ]
+        }
+      },
+      "annotations": {
+        "person_ids": {
+          "shape": [
+            2
+          ],
+          "dtype": "int64"
+        },
+        "xy": {
+          "shape": [
+            2,
+            138,
+            2
+          ],
+          "dtype": "float32"
+        },
+        "fisheye_xy": {
+          "shape": [
+            2,
+            138,
+            2
+          ],
+          "dtype": "float32"
+        },
+        "model_domain": {
+          "shape": [
+            2,
+            138
+          ],
+          "dtype": "bool"
+        },
+        "in_view": {
+          "shape": [
+            2,
+            138
+          ],
+          "dtype": "bool"
+        },
+        "surface_visible": {
+          "shape": [
+            2,
+            138
+          ],
+          "dtype": "bool"
+        },
+        "visible": {
+          "shape": [
+            2,
+            138
+          ],
+          "dtype": "bool"
+        },
+        "out_of_view": {
+          "shape": [
+            2,
+            138
+          ],
+          "dtype": "bool"
+        },
+        "occluded_in_view": {
+          "shape": [
+            2,
+            138
+          ],
+          "dtype": "bool"
+        },
+        "camera_to_world_erp": {
+          "shape": [
+            4,
+            4
+          ],
+          "dtype": "float64"
+        },
+        "world_densekp": {
+          "shape": [
+            2,
+            138,
+            3
+          ],
+          "dtype": "float64"
+        },
+        "scene_episode_id": {
+          "shape": [],
+          "dtype": "<U39"
+        },
+        "rig_id": {
+          "shape": [],
+          "dtype": "<U9"
+        },
+        "occlusion_evidence_code": {
+          "shape": [
+            2,
+            138
+          ],
+          "dtype": "uint8"
+        },
+        "front_instance_id": {
+          "shape": [
+            2,
+            138
+          ],
+          "dtype": "int32"
+        },
+        "front_range_m": {
+          "shape": [
+            2,
+            138
+          ],
+          "dtype": "float32"
+        },
+        "gt_minus_front_range_m": {
+          "shape": [
+            2,
+            138
+          ],
+          "dtype": "float32"
+        },
+        "nearer_same_front_id_3x3_count": {
+          "shape": [
+            2,
+            138
+          ],
+          "dtype": "uint8"
+        },
+        "frame_index": {
+          "shape": [],
+          "dtype": "int64"
+        },
+        "time_tick": {
+          "shape": [],
+          "dtype": "int64"
+        },
+        "time_base": {
+          "shape": [
+            2
+          ],
+          "dtype": "int64"
+        },
+        "person_asset_frame": {
+          "shape": [
+            2
+          ],
+          "dtype": "int64"
+        },
+        "person_source_frame": {
+          "shape": [
+            2
+          ],
+          "dtype": "int64"
+        },
+        "person_source_time_tick": {
+          "shape": [
+            2
+          ],
+          "dtype": "int64"
+        },
+        "person_source_time_base": {
+          "shape": [
+            2,
+            2
+          ],
+          "dtype": "int64"
+        },
+        "person_quantization_error_seconds": {
+          "shape": [
+            2,
+            2
+          ],
+          "dtype": "int64"
+        }
+      },
+      "mamma_native_crop": {
+        "rect_xyxy": [
+          1281,
+          1204,
+          1790,
+          1879
+        ],
+        "roi_xyxy": [
+          1044,
+          862,
+          2106,
+          2213
+        ],
+        "status": "supported",
+        "box_xyxy": [
+          1437,
+          1263,
+          1634,
+          1820
+        ],
+        "gaussian_sigma": 0,
+        "sampling_margin_px": 3
+      },
+      "raster": {
+        "roi_xyxy": [
+          1044,
+          862,
+          2106,
+          2213
+        ],
+        "offset_xy": [
+          1044,
+          862
+        ],
+        "stored_size_wh": [
+          1062,
+          1351
+        ],
+        "render_coverage_xyxy": [
+          1044,
+          862,
+          2106,
+          2213
+        ],
+        "outside_stored_region": "unknown"
+      },
+      "scene_matrices": {
+        "path": "/mnt/data1/yy/home/yy/Projects/densekp_retrain/outputs/experiments/first_four_episodes_a1_20261011/e03/run/rigs/rig_front/scene_matrices.npy",
+        "exists": true,
+        "shape": [
+          31,
+          2,
+          4,
+          4
+        ],
+        "selected_row": 15,
+        "person_index": 0
+      },
+      "source_asset": {
+        "path": "/mnt/data1/yy/home/yy/Projects/densekp_retrain/outputs/experiments/first_four_episodes_a1_20261011/e03/rider_adapter.json",
+        "exists": true,
+        "asset_id": "cycling_M02_v3_zenodo10668611_p1_alternate_9600_9696_simple_v1",
+        "body_vertices": "/mnt/data1/yy/home/yy/Projects/densekp_retrain/outputs/experiments/bvh_p1_smplx_pilot_a2_20261010/p1_alternate/fit_attempt_1/vertices.npy",
+        "body_faces": "/mnt/data1/yy/home/yy/Projects/densekp_retrain/outputs/experiments/bvh_p1_smplx_pilot_a2_20261010/p1_alternate/faces.npy",
+        "cloth_vertices": "/mnt/data1/yy/home/yy/Projects/densekp_retrain/outputs/experiments/bvh_p1_dressed_assets_a2_20261010/p1_alternate/full/clothing_vertices.npy",
+        "head_transforms": "/mnt/data1/yy/home/yy/Projects/densekp_retrain/outputs/experiments/bvh_p1_dressed_assets_a2_20261010/p1_alternate/full/head_transforms.npy",
+        "all_geometry_files_exist": true
+      }
+    }
+  ]
+}

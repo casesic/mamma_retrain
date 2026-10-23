@@ -1,0 +1,8 @@
+{
+  "schema": "mamma_box_probe_v1",
+  "manifest_reader": "/mnt/data1/yy/home/yy/Projects/mamma_retrain/configs/retrain/mamma_manifest_reader_20261015.json",
+  "baseline_config": "/mnt/data1/yy/home/yy/Projects/mamma_retrain/configs/retrain/mamma_original_baseline_pilot_20261015.json",
+  "variants": ["native", "cx_minus_03", "cx_plus_03", "cy_minus_03", "cy_plus_03", "scale_09", "scale_11"],
+  "augmentation": "fixed_probe_only",
+  "integration_only": true
+}

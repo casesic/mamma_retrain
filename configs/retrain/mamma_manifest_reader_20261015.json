@@ -1,0 +1,18 @@
+{
+  "schema": "mamma_manifest_reader_v1",
+  "template": "/home/yy/Repos/mamma/data/body_models/downsampled_verts/verts_512.pkl",
+  "reference_faces": "/mnt/data1/yy/home/yy/Projects/densekp_retrain/outputs/audits/bedlam_r138_compatibility_a2_20261009/locked_head_attributes.npz",
+  "reference_r138": "/mnt/data1/yy/home/yy/Projects/densekp_retrain/assets/densekp_regressor_R.npy",
+  "box_policy": "native_oracle_only",
+  "mask_policy": "oracle_visible_instance_binary_nearest",
+  "augmentation": "off",
+  "future_box_augmentation": "requires_explicit_rectangular_MAMMA_support_check_and_new_ROI",
+  "future_visibility": "requires_point_level_live_depth_instance_evidence",
+  "eligibility": "integration_only",
+  "qualified_assets": {
+    "/mnt/data1/yy/home/yy/Projects/densekp_retrain/outputs/experiments/bvh_p1_smplx_pilot_a2_20261010/p1_alternate/fit_attempt_1/vertices.npy": "standard_male_smplx",
+    "/mnt/data1/yy/home/yy/Projects/densekp_retrain/outputs/experiments/walking_composition_a2_20261010/cache/body/M04__KIT425_walk__0_94/vertices.npy": "locked_head_neutral_smplx",
+    "/mnt/data1/yy/home/yy/Projects/densekp_retrain/outputs/experiments/walking_composition_a2_20261010/cache/body/M03__KIT11_walk__0_120/vertices.npy": "locked_head_neutral_smplx"
+  },
+  "manifest": "/mnt/data1/yy/home/yy/Projects/mamma_retrain/configs/retrain/mamma_observations_pilot_v1.json"
+}

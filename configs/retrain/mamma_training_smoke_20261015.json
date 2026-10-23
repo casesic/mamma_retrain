@@ -1,0 +1,21 @@
+{
+  "schema": "mamma_training_smoke_v1",
+  "manifest_reader": "/mnt/data1/yy/home/yy/Projects/mamma_retrain/configs/retrain/mamma_manifest_reader_20261015.json",
+  "baseline_config": "/mnt/data1/yy/home/yy/Projects/mamma_retrain/configs/retrain/mamma_original_baseline_pilot_20261015.json",
+  "batch_indices": [0, 2],
+  "batch_size": 1,
+  "augmentation": "off",
+  "model_heads": ["joints2d", "visibility", "contact", "floor_contact"],
+  "loss_enabled": {"coordinate": true, "visibility": true, "contact": false, "floor_contact": false},
+  "supervised_visibility": false,
+  "coordinate_scale": 100.0,
+  "part_weight": 1.0,
+  "residual_cap": 25.0,
+  "optimizer": {"type": "AdamW", "lr": 0.00001, "betas": [0.9, 0.999], "weight_decay": 0.0001},
+  "scheduler": "none",
+  "seed": 0,
+  "precision": "float32",
+  "planned_logical_updates": 2,
+  "maximum_actual_optimizer_steps": 3,
+  "eligibility": "infrastructure_smoke_only"
+}

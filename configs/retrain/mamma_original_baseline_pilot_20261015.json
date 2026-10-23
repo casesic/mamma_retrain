@@ -1,0 +1,19 @@
+{
+  "schema": "mamma_original_baseline_pilot_v1",
+  "input_config": "/mnt/data1/yy/home/yy/Projects/mamma_retrain/configs/retrain/mamma_roi_pilot_20261013.json",
+  "model_config": "/mnt/data1/yy/home/yy/Projects/mamma_retrain/landmarks/configs/train/models_2d/config_mammanet_mask_512.yaml",
+  "checkpoint": "/home/yy/Repos/mamma/data/weights/ma_2d/mamma_mask_full_cvpr.ckpt",
+  "tensor_state": "/mnt/data1/yy/home/yy/Projects/mamma_retrain/outputs/experiments/mamma_original_baseline_pilot_20261015/tensor_state.pt",
+  "output": "/mnt/data1/yy/home/yy/Projects/mamma_retrain/outputs/experiments/mamma_original_baseline_pilot_20261015",
+  "device_uuid": "GPU-d481acc7-106f-29e5-1298-8c0d398261b2",
+  "cuda_visible_devices": "0",
+  "precision": "float32",
+  "batch_size": 1,
+  "seed": 0,
+  "box_policy": "native_oracle_only",
+  "mask_policy": "oracle_visible_instance_binary_nearest",
+  "augmentation": "off",
+  "repeat_slot": 0,
+  "normal_forward_count": 6,
+  "integration_only": true
+}
