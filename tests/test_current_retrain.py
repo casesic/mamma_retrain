@@ -409,6 +409,29 @@ class CurrentRetrainTest(unittest.TestCase):
         np.testing.assert_allclose(seam_rgb, center_rgb, atol=1e-5)
         np.testing.assert_array_equal(seam_mask, center_mask)
 
+    def test_native_crop_support_matches_float32_export_at_exact_aspect(self):
+        from mamma_ext.data import mask_box_inclusive
+
+        roi = np.array([0, 0, 180, 180])
+        mask = np.zeros((180, 180), np.uint8)
+        mask[41:132, 40:82] = 255
+        box = mask_box_inclusive(mask, roi[:2])
+        np.testing.assert_array_equal(box, [40, 41, 81, 131])
+        full = np.array([200, 180])
+        _, _, _, rect = native_plan(box, roi, [180, 180], full)
+        np.testing.assert_array_equal(rect, [16, 28, 104, 143])
+        image = np.zeros((180, 180, 3), np.uint8)
+        support = dict(
+            crop_policy_version="mask_bbox_inclusive_v1",
+            box_xyxy=box.tolist(),
+            sampling_rect_erp=rect.tolist(),
+            source_sampling_supported=True,
+        )
+        rgb, cropped_mask, _, used_box = _crop_raster(image, mask, roi, full, support)
+        self.assertEqual(rgb.shape, (3, 512, 384))
+        self.assertEqual(cropped_mask.shape, (512, 384))
+        np.testing.assert_array_equal(used_box, box)
+
 
 if __name__ == "__main__":
     unittest.main()

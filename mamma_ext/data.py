@@ -9,7 +9,7 @@ import torch
 
 from .upstream import DEFAULT_MEAN, DEFAULT_STD, crop_math
 
-expand_to_aspect_ratio, gen_trans_from_patch_cv = crop_math()
+_, gen_trans_from_patch_cv = crop_math()
 READER_SCHEMA = "mamma_reader_v2"
 BUNDLE_SCHEMA = "mamma_bundle_v1"
 TEMPLATE_ID = "MAMMA_verts_512_ordered_v1"
@@ -63,7 +63,14 @@ def native_plan(box, roi, stored, full, *, periodic_x=False):
     ):
         raise ValueError("invalid_roi")
     center = (box[:2] + box[2:]) / 2
-    size = expand_to_aspect_ratio((box[2:] - box[:2]) * 1.2, (384, 512))
+    # The generator plans the native support in float32. At an exact 384:512
+    # aspect ratio, float64 expansion can add a subpixel epsilon and move all
+    # four integer support edges by one pixel after floor/ceil.
+    size = (box[2:] - box[:2]) * np.float32(1.2)
+    if size[0] / size[1] < 384 / 512:
+        size[0] = size[1] * np.float32(384 / 512)
+    else:
+        size[1] = size[0] * np.float32(512 / 384)
     downsampling = size.max() / 384 / 2
     sigma = (downsampling - 1) / 2 if downsampling > 1.1 else 0
     margin = int(np.ceil(4 * sigma)) + 3
