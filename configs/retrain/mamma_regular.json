@@ -16,9 +16,9 @@
     ],
     "weight_decay": 0.0001
   },
-  "schema": "mamma_training_v2",
+  "schema": "mamma_training_v3",
   "input_config": "mamma_saved_gt_reader.json",
-  "crop_policy_version": "mask_bbox_inclusive_v1",
+  "crop_policy_version": "mask_bbox_periodic_v2",
   "augmentation": "off",
   "loss_enabled": {
     "coordinate": true,

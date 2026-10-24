@@ -303,9 +303,15 @@ def evaluate(args, cfg, dataset):
         prediction, _ = predict_one(model, item, device)
         raw = prediction["joints2d"][0]
         model_xy, erp, affine_erp = restore_xy(raw[:, :2], item, True)
-        if np.max(np.abs(erp - affine_erp)) > 0.01:
+        restore_delta = erp - affine_erp
+        if item.get("periodic_x", False):
+            width = int(item["full_size_wh"][0])
+            restore_delta[:, 0] = (restore_delta[:, 0] + width / 2) % width - width / 2
+        if np.max(np.abs(restore_delta)) > 0.01:
             raise ValueError("deployment_affine_restoration_disagree")
-        errors, metrics = summarize_errors(erp, item["xy_erp"], item["coordinate_loss_valid"])
+        errors, metrics = summarize_errors(
+            erp, item["xy_erp"], item["coordinate_loss_valid"], int(item["full_size_wh"][0])
+        )
         all_errors.extend(errors[item["coordinate_loss_valid"]].tolist())
         valid = item["visibility_loss_valid"]
         if valid.any():

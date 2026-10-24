@@ -6,7 +6,7 @@ from pathlib import Path
 import numpy as np
 import torch
 
-REGULAR_SCHEMA = "mamma_regular_resume_v3"
+REGULAR_SCHEMA = "mamma_regular_resume_v4"
 
 
 def capture_rng():

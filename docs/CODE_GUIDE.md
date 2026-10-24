@@ -25,6 +25,6 @@
 
 训练配置在 `configs/retrain/mamma_regular.json`。`loss_enabled.visibility` 同时决定 visibility 损失是否启用、visibility 头是否加入优化器。接触头虽然留在模型结构里，但没有接触损失，且不加入优化器。损失公式与空监督跳过更新由 `tasks.py` 负责；改这里应先用小张量对照数值、unknown 标签和空样本。模型头列表表达原权重的结构，不代表这些任务正在训练。
 
-更新边界在 `recovery.py`：正常文件是 `mamma_regular_resume_v3`。它校验当前配置与数据引用，严格恢复模型和优化器，并恢复 Python、NumPy、PyTorch RNG 以及采样位置。旧 smoke 使用的带 `box_stream` 的 v1 恢复链已经移除。更改 checkpoint 内容或含义时必须换 schema，不能让旧文件在相同版本下被误读。这里的假模块测试证明保存/读取逻辑，不等于真实 MAMMA 训练恢复验证。
+更新边界在 `recovery.py`：正常文件是 `mamma_regular_resume_v4`。它校验当前配置与数据引用，严格恢复模型和优化器，并恢复 Python、NumPy、PyTorch RNG 以及采样位置。旧 smoke 使用的带 `box_stream` 的 v1 恢复链已经移除。更改 checkpoint 内容或含义时必须换 schema，不能让旧文件在相同版本下被误读。这里的假模块测试证明保存/读取逻辑，不等于真实 MAMMA 训练恢复验证。
 
 如果只想改变数据清单路径，改 reader 配置或在命令中传 `--manifest`；如果只想改变训练任务开关，改训练配置。两个项目通过数据包交接，不互相导入实现。当前 `execution_authorized=false` 和 visibility 标签资格限制不能因整理代码而绕开。

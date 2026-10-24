@@ -145,16 +145,20 @@ def restore_xy(raw_xy, item, plus_minus_one=True):
     model_xy = normalized * [384, 512]
     deployment_erp = normalized * size - size / 2 + center
     affine_erp = cv2.transform(model_xy[None], item["affine_model_to_erp"])[0]
+    if item.get("periodic_x", False):
+        width = int(item["full_size_wh"][0])
+        deployment_erp[:, 0] %= width
+        affine_erp[:, 0] %= width
     return model_xy, deployment_erp, affine_erp
 
 
-def summarize_errors(pred_erp, gt_erp, valid):
+def summarize_errors(pred_erp, gt_erp, valid, width=5760):
     valid = np.asarray(valid, dtype=bool)
     finite = np.isfinite(pred_erp).all(1)
     errors = np.full(len(valid), np.nan, dtype=np.float64)
-    errors[valid & finite] = np.linalg.norm(
-        pred_erp[valid & finite] - gt_erp[valid & finite], axis=1
-    )
+    delta = pred_erp[valid & finite] - gt_erp[valid & finite]
+    delta[:, 0] = (delta[:, 0] + width / 2) % width - width / 2
+    errors[valid & finite] = np.linalg.norm(delta, axis=1)
     n = int(valid.sum())
     failed = int((valid & ~finite).sum())
     good = errors[valid & finite]

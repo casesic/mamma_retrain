@@ -16,7 +16,8 @@ from mamma_ext.policy import (
     configure_active_optimizer,
     load_active_policy,
 )
-from mamma_ext.model import restore_xy
+from mamma_ext.model import restore_xy, summarize_errors
+from mamma_ext.data import periodic_mask_box, native_plan, _crop_raster
 from mamma_ext.recovery import (
     capture_rng,
     load_evaluation_boundary,
@@ -107,7 +108,7 @@ def tiny_bundle(root):
         observations=[row],
     )
     write_json(root / "observations.json", bundle)
-    write_json(root / "reader.json", {"schema": "mamma_reader_v1", "manifest": "observations.json"})
+    write_json(root / "reader.json", {"schema": "mamma_reader_v2", "manifest": "observations.json"})
     return bundle, label, annotation
 
 
@@ -146,7 +147,7 @@ class CurrentRetrainTest(unittest.TestCase):
     def test_current_policy_relative_paths_and_old_schema_reject(self):
         config = ROOT / "configs/retrain/mamma_regular.json"
         current, dataset = load_active_policy(config, manifest_override=REAL_MANIFEST)
-        self.assertEqual(current["schema"], "mamma_training_v2")
+        self.assertEqual(current["schema"], "mamma_training_v3")
         self.assertEqual(current["input_config"], str(config.parent / "mamma_saved_gt_reader.json"))
         self.assertEqual(len(dataset), 4)
         self.assertFalse(current["execution_authorized"])
@@ -257,10 +258,10 @@ class CurrentRetrainTest(unittest.TestCase):
         refs.update(
             model_config=str(Path("fixture").resolve()),
             tensor_state=str(Path("fixture").resolve()),
-            crop_policy_version="mask_bbox_inclusive_v1",
+            crop_policy_version="mask_bbox_periodic_v2",
             gt_policy="saved_mamma_512_npz_v1",
             augmentation="off",
-            training_schema="mamma_training_v2",
+            training_schema="mamma_training_v3",
         )
         refs["loss_enabled"] = {"coordinate": True, "visibility": True}
         random.seed(8)
@@ -292,9 +293,9 @@ class CurrentRetrainTest(unittest.TestCase):
             evaluation_config = dict(
                 model_config="fixture",
                 tensor_state="fixture",
-                crop_policy_version="mask_bbox_inclusive_v1",
+                crop_policy_version="mask_bbox_periodic_v2",
                 augmentation="off",
-                schema="mamma_training_v2",
+                schema="mamma_training_v3",
                 loss_enabled=refs["loss_enabled"],
             )
             load_evaluation_boundary(path, model, evaluation_config)
@@ -355,6 +356,58 @@ class CurrentRetrainTest(unittest.TestCase):
         np.testing.assert_allclose(model_xy, [[192.0, 256.0]], rtol=0, atol=0)
         np.testing.assert_allclose(deployed_xy, [center], rtol=0, atol=1e-5)
         np.testing.assert_allclose(inverted_xy, deployed_xy, rtol=0, atol=1e-5)
+
+    def test_periodic_mask_crop_and_erp_restoration(self):
+        import cv2
+
+        width = 64
+        mask = np.zeros((48, width), np.uint8)
+        mask[12:34, :7] = 255
+        mask[12:34, 58:] = 255
+        box = periodic_mask_box(mask, np.array([0, 8]), width)
+        np.testing.assert_array_equal(box, [58, 20, 70, 41])
+        roi = np.array([0, 8, width, 56])
+        center, size, _, rect = native_plan(box, roi, [64, 48], [64, 64], periodic_x=True)
+        self.assertLess(rect[2] - rect[0], width)
+        _, affine_for_crop = crop_math()
+        forward = affine_for_crop(center[0], center[1], size[0], size[1], 384, 512, 1.0, 0)
+        item = dict(
+            parent_box_xyxy=box,
+            affine_model_to_erp=cv2.invertAffineTransform(forward),
+            periodic_x=True,
+            full_size_wh=np.array([width, 64]),
+        )
+        point = np.array([[2.0, 30.0]])
+        unfolded = point.copy()
+        unfolded[:, 0] += width
+        model_xy = unfolded @ forward[:, :2].T + forward[:, 2]
+        raw = model_xy / [384, 512] * 2 - 1
+        _, deployed, inverted = restore_xy(raw, item, True)
+        np.testing.assert_allclose(deployed, point, atol=1e-4)
+        np.testing.assert_allclose(inverted, point, atol=1e-4)
+        errors, _ = summarize_errors(np.array([[63.5, 30.0]]), np.array([[0.5, 30.0]]), [True], width)
+        self.assertAlmostEqual(float(errors[0]), 1.0)
+
+        image = np.zeros((48, width, 3), np.uint8)
+        image[:, :, 0] = np.arange(width, dtype=np.uint8)
+        image[:, :, 1] = np.arange(48, dtype=np.uint8)[:, None]
+        def support_for(target_mask):
+            target_box = periodic_mask_box(target_mask, roi[:2], width)
+            _, _, _, target_rect = native_plan(target_box, roi, [64, 48], [64, 64], periodic_x=True)
+            return dict(crop_policy_version="mask_bbox_periodic_v2",
+                        box_xyxy=target_box.tolist(),
+                        sampling_rect_erp=target_rect.tolist(),
+                        source_sampling_supported=True)
+        seam_rgb, seam_mask, _, _ = _crop_raster(
+            image, mask, roi, np.array([64, 64]), support_for(mask)
+        )
+        centered_image = np.roll(image, 32, axis=1)
+        centered_mask = np.roll(mask, 32, axis=1)
+        center_rgb, center_mask, _, _ = _crop_raster(
+            centered_image, centered_mask, roi, np.array([64, 64]), support_for(centered_mask)
+        )
+        np.testing.assert_allclose(seam_rgb, center_rgb, atol=1e-5)
+        np.testing.assert_array_equal(seam_mask, center_mask)
 
 
 if __name__ == "__main__":

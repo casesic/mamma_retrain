@@ -2,6 +2,8 @@
 
 这个项目读取相邻的 `human_data_generator` 项目产出的 `mamma_bundle_v1` 数据包。训练输入是一张 RGB 图和这次目标人物的 mask；裁剪框由该 mask 计算，不单独提供框或做框增强。标签是固定顺序的 512 个完整 ERP 二维点及每点可见性：`1` 可见、`0` 被遮挡、`-1` 未知。每个人都有自己的观察记录；没有可用 mask 的记录留在清单中，标为 `absent`。
 
+ERP 左右边界相连。跨缝相机保存全宽条带，reader 从目标 mask 得到连续的周期裁剪框；512 点标签仍是原始完整 ERP XY，坐标还原后才对横坐标取模，评价误差也取最短周期距离。清单逐行标明裁剪规则：全宽条带用 `mask_bbox_periodic_v2`，普通 ROI 用 `mask_bbox_inclusive_v1`。两者都没有独立框增强。
+
 目前只有两份正常配置：[训练配置](../configs/retrain/mamma_regular.json)控制任务和执行条件，[reader 配置](../configs/retrain/mamma_saved_gt_reader.json)指出数据清单。配置中的项目内路径相对配置文件解析。reader 默认清单指向未来的 `key_batch_001`，该批数据尚未生成；检查已存在的数据时，请用 `--manifest` 指定实际清单的**绝对路径**。
 
 ## 先看数据是否能读
@@ -28,8 +30,8 @@ env CUDA_VISIBLE_DEVICES='' PYTHONDONTWRITEBYTECODE=1 PYTHON_DOTENV_DISABLED=1 O
 
 同一 episode、相同资产 ID 或相同源 manifest ID 不得同时出现在训练和验证集。这里不自动识别同一次动作录制的不同片段，也不增加额外分组任务。
 
-当前训练配置是 `mamma_training_v2`：`loss_enabled.visibility` 是可见性损失及该头优化器成员的唯一开关。它现在为 `true`，但 `execution_authorized=false`，而可信遮挡负例资格仍是 `pending_representative_negative_evidence`。因此上面的 `plan`、`check-data` 可运行，**当前配置不能执行训练**；这次已有数据中的 visibility 计数为 604 个 `1`、0 个可信 `0`、3492 个 `-1`，不能据此宣称训练准备完成。
+当前训练配置是 `mamma_training_v3`，reader 配置是 `mamma_reader_v2`，裁剪能力声明为 `mask_bbox_periodic_v2`。`loss_enabled.visibility` 是可见性损失及该头优化器成员的唯一开关。它现在为 `true`，但 `execution_authorized=false`，而可信遮挡负例资格仍是 `pending_representative_negative_evidence`。因此上面的 `plan`、`check-data` 可运行，**当前配置不能执行训练**。早期小试的 604 个正例、0 个可信负例、3492 个 unknown 只是历史基准；新四类关键帧出现了候选遮挡负例，也仍需代表性资格核查。
 
-未来在数据资格和执行条件另行确认后，仍使用 `scripts/mamma_retrain.py train`，明确传入训练清单、互不交叉的验证清单、输出目录、设备、更新预算、checkpoint 间隔和 `--execute`。`evaluate` 也需要显式执行条件。正常恢复文件使用 `mamma_regular_resume_v3`，严格校验配置与数据合同，并保存模型、优化器、随机数状态、更新次数和下一个采样位置。当前没有用真实 MAMMA 网络验证新恢复路径。
+未来在数据资格和执行条件另行确认后，仍使用 `scripts/mamma_retrain.py train`，明确传入训练清单、互不交叉的验证清单、输出目录、设备、更新预算、checkpoint 间隔和 `--execute`。`evaluate` 也需要显式执行条件。正常恢复文件使用 `mamma_regular_resume_v4`，严格校验配置与数据合同，并保存模型、优化器、随机数状态、更新次数和下一个采样位置。当前没有用真实 MAMMA 网络验证新恢复路径。
 
 想顺着代码阅读实现，请看 [源码阅读指南](CODE_GUIDE.md)。历史小试报告和产物保留作证据，不作为当前运行入口。

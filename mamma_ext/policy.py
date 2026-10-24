@@ -6,7 +6,7 @@ from pathlib import Path
 from .data import MammaSavedGTDataset
 from .tasks import configure_training_parameters, masked_task_loss
 
-TRAINING_SCHEMA = "mamma_training_v2"
+TRAINING_SCHEMA = "mamma_training_v3"
 POLICY_KEYS = {
     "model_heads",
     "coordinate_scale",
@@ -40,7 +40,7 @@ def load_active_policy(path, manifest_override=None):
     if (
         set(config) != POLICY_KEYS
         or config.get("schema") != TRAINING_SCHEMA
-        or config.get("crop_policy_version") != "mask_bbox_inclusive_v1"
+        or config.get("crop_policy_version") != "mask_bbox_periodic_v2"
         or config.get("augmentation") != "off"
         or type(config.get("execution_authorized")) is not bool
         or config.get("model_heads") != ["joints2d", "visibility", "contact", "floor_contact"]

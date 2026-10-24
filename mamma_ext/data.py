@@ -10,7 +10,7 @@ import torch
 from .upstream import DEFAULT_MEAN, DEFAULT_STD, crop_math
 
 expand_to_aspect_ratio, gen_trans_from_patch_cv = crop_math()
-READER_SCHEMA = "mamma_reader_v1"
+READER_SCHEMA = "mamma_reader_v2"
 BUNDLE_SCHEMA = "mamma_bundle_v1"
 TEMPLATE_ID = "MAMMA_verts_512_ordered_v1"
 
@@ -28,7 +28,28 @@ def mask_box_inclusive(mask, offset):
     )
 
 
-def native_plan(box, roi, stored, full):
+def periodic_mask_box(mask, offset, width):
+    """Smallest cyclic foreground interval, expressed on an unwrapped X axis."""
+    if (
+        mask.ndim != 2
+        or mask.shape[1] != width
+        or mask.dtype != np.uint8
+        or not np.isin(mask, [0, 255]).all()
+    ):
+        raise ValueError("invalid_periodic_person_mask")
+    columns = np.flatnonzero(np.any(mask > 0, axis=0))
+    rows = np.flatnonzero(np.any(mask > 0, axis=1))
+    if len(columns) < 2 or len(rows) < 2:
+        raise ValueError("empty_or_degenerate_person_mask")
+    gaps = np.diff(np.r_[columns, columns[0] + width])
+    start = int(columns[(int(np.argmax(gaps)) + 1) % len(columns)])
+    end = int(((columns - start) % width).max()) + start
+    if end == start:
+        raise ValueError("empty_or_degenerate_person_mask")
+    return np.array([start, offset[1] + rows[0], end, offset[1] + rows[-1]], np.int64)
+
+
+def native_plan(box, roi, stored, full, *, periodic_x=False):
     """Require the whole expanded crop and Gaussian filter support inside ROI."""
     box = np.asarray(box, np.float32)
     roi = np.asarray(roi, np.int64)
@@ -50,7 +71,16 @@ def native_plan(box, roi, stored, full):
         np.floor(center - size / 2).astype(int) - margin,
         np.ceil(center + size / 2).astype(int) + margin,
     ]
-    if np.any(rect[:2] < roi[:2]) or np.any(rect[2:] > roi[2:]):
+    if periodic_x:
+        if (
+            roi[0] != 0
+            or roi[2] != full[0]
+            or rect[1] < roi[1]
+            or rect[3] > roi[3]
+            or rect[2] - rect[0] > full[0]
+        ):
+            raise ValueError("crop_filter_support_outside_roi")
+    elif np.any(rect[:2] < roi[:2]) or np.any(rect[2:] > roi[2:]):
         raise ValueError("crop_filter_support_outside_roi")
     return center, size, sigma, rect
 
@@ -179,8 +209,13 @@ def _crop_raster(image, mask, roi, full, support):
         or mask.shape != image.shape[:2]
     ):
         raise ValueError("stored_raster_size_conflict")
-    box = mask_box_inclusive(mask, roi[:2])
-    center, size, sigma, rect = native_plan(box, roi, stored, full)
+    periodic_x = support["crop_policy_version"] == "mask_bbox_periodic_v2"
+    box = (
+        periodic_mask_box(mask, roi[:2], int(full[0]))
+        if periodic_x
+        else mask_box_inclusive(mask, roi[:2])
+    )
+    center, size, sigma, rect = native_plan(box, roi, stored, full, periodic_x=periodic_x)
     if (
         support["box_xyxy"] != box.tolist()
         or support["sampling_rect_erp"] != rect.tolist()
@@ -189,8 +224,13 @@ def _crop_raster(image, mask, roi, full, support):
         raise ValueError("crop_support_disagrees_with_mask")
 
     x0, y0, x1, y1 = rect - np.tile(roi[:2], 2)
-    local_image = image[y0:y1, x0:x1]
-    local_mask = mask[y0:y1, x0:x1]
+    if periodic_x:
+        columns = np.arange(rect[0], rect[2]) % int(full[0])
+        local_image = image[y0:y1][:, columns]
+        local_mask = mask[y0:y1][:, columns]
+    else:
+        local_image = image[y0:y1, x0:x1]
+        local_mask = mask[y0:y1, x0:x1]
     if sigma:
         local_image = cv2.GaussianBlur(
             local_image.astype(np.float32),
@@ -222,16 +262,23 @@ def _crop_raster(image, mask, roi, full, support):
     return rgb, mask_patch, affine, box
 
 
-def _targets(files, person_index, affine, roi):
+def _targets(files, person_index, affine, roi, box, periodic_x):
     with np.load(files["labels"], allow_pickle=False) as gt:
         xy = gt["xy_full_erp"][person_index].astype(np.float64)
         geometry = gt["geometry_defined"][person_index].astype(bool)
         physical = gt["physical_domain"][person_index].astype(bool)
         coverage = gt["render_coverage"][person_index].astype(bool)
         visibility = gt["visibility_value"][person_index].astype(np.int8)
-    model_xy = xy @ affine[:, :2].T + affine[:, 2]
+    crop_xy = xy.copy()
+    if periodic_x:
+        width = int(roi[2] - roi[0])
+        center_x = (box[0] + box[2]) / 2
+        crop_xy[:, 0] += np.round((center_x - crop_xy[:, 0]) / width) * width
+    model_xy = crop_xy @ affine[:, :2].T + affine[:, 2]
     in_crop = np.all((model_xy >= 0) & (model_xy < [384, 512]), axis=1)
-    in_roi = np.all((xy >= roi[:2]) & (xy < roi[2:]), axis=1)
+    in_roi = (xy[:, 1] >= roi[1]) & (xy[:, 1] < roi[3])
+    if not periodic_x:
+        in_roi &= (xy[:, 0] >= roi[0]) & (xy[:, 0] < roi[2])
     coordinate_valid = geometry & physical & coverage & in_roi & in_crop & np.isfinite(xy).all(1)
     return xy, model_xy, visibility, coordinate_valid
 
@@ -252,7 +299,12 @@ class MammaSavedGTDataset(torch.utils.data.Dataset):
             if row["status"] == "observed":
                 if (
                     row["crop_support"] is None
-                    or row["crop_support"]["crop_policy_version"] != "mask_bbox_inclusive_v1"
+                    or row["crop_support"]["crop_policy_version"]
+                    not in ("mask_bbox_inclusive_v1", "mask_bbox_periodic_v2")
+                    or (
+                        row["crop_support"]["crop_policy_version"] == "mask_bbox_periodic_v2"
+                        and row["roi_xyxy"][0::2] != [0, row["full_image_size_wh"][0]]
+                    )
                 ):
                     raise ValueError("missing_mask_crop_support")
                 self.ready.append(index)
@@ -291,8 +343,9 @@ class MammaSavedGTDataset(torch.utils.data.Dataset):
         roi = np.asarray(row["roi_xyxy"], np.int64)
         full = np.asarray(row["full_image_size_wh"], np.int64)
         rgb, mask_patch, affine, box = _crop_raster(image, mask, roi, full, row["crop_support"])
+        periodic_x = row["crop_support"]["crop_policy_version"] == "mask_bbox_periodic_v2"
         xy, model_xy, visibility, coordinate_valid = _targets(
-            files, row["person_index"], affine, roi
+            files, row["person_index"], affine, roi, box, periodic_x
         )
         return dict(
             img=rgb,
@@ -310,6 +363,7 @@ class MammaSavedGTDataset(torch.utils.data.Dataset):
             parent_box_xyxy=box,
             roi_xyxy=roi,
             full_size_wh=full,
+            periodic_x=periodic_x,
             source_sampling_supported=True,
             gt_source="saved_mamma_512_npz_v1",
         )
