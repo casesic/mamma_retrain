@@ -16,17 +16,16 @@
     ],
     "weight_decay": 0.0001
   },
-  "schema": "mamma_training_v1",
-  "input_config": "/mnt/data1/yy/home/yy/Projects/mamma_retrain/configs/retrain/mamma_saved_gt_reader.json",
+  "schema": "mamma_training_v2",
+  "input_config": "mamma_saved_gt_reader.json",
   "crop_policy_version": "mask_bbox_inclusive_v1",
   "augmentation": "off",
   "loss_enabled": {
     "coordinate": true,
     "visibility": true
   },
-  "supervised_visibility": true,
   "execution_authorized": false,
   "label_qualification": "pending_representative_negative_evidence",
-  "model_config": "/mnt/data1/yy/home/yy/Projects/mamma_retrain/landmarks/configs/train/models_2d/config_mammanet_mask_512.yaml",
-  "tensor_state": "/mnt/data1/yy/home/yy/Projects/mamma_retrain/outputs/experiments/mamma_original_baseline_pilot_20261015/tensor_state.pt"
+  "model_config": "../../landmarks/configs/train/models_2d/config_mammanet_mask_512.yaml",
+  "tensor_state": "../../outputs/experiments/mamma_original_baseline_pilot_20261015/tensor_state.pt"
 }
