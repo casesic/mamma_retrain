@@ -1,37 +1,50 @@
-# MAMMA 微调：从数据检查开始
+# MAMMA 当前使用入口
 
-这个项目读取相邻的 `human_data_generator` 项目产出的 `mamma_bundle_v1` 数据包。训练输入是一张 RGB 图和这次目标人物的 mask；裁剪框由该 mask 计算，不单独提供框或做框增强。标签是固定顺序的 512 个完整 ERP 二维点及每点可见性：`1` 可见、`0` 被遮挡、`-1` 未知。每个人都有自己的观察记录；没有可用 mask 的记录留在清单中，标为 `absent`。
+## 本轮已完成，先看这里
 
-ERP 左右边界相连。跨缝相机保存全宽条带，reader 从目标 mask 得到连续的周期裁剪框；512 点标签仍是原始完整 ERP XY，坐标还原后才对横坐标取模，评价误差也取最短周期距离。清单逐行标明裁剪规则：全宽条带用 `mask_bbox_periodic_v2`，普通 ROI 用 `mask_bbox_inclusive_v1`。两者都没有独立框增强。
+固定使用全量一遍的第812步权重与可见阈值 **0.85**，原模型以0.5保留对照。训练为28场景、3245条有效观察各一次、batch=4；主验证已统一为7场景814条。权重、配置校验值、运行命令及保存范围见 **[本轮交付说明](DELIVERY_20261025.md)**。
 
-目前只有两份正常配置：[训练配置](../configs/retrain/mamma_regular.json)控制任务和执行条件，[reader 配置](../configs/retrain/mamma_saved_gt_reader.json)指出数据清单。配置中的项目内路径相对配置文件解析。reader 默认清单指向未来的 `key_batch_001`，该批数据尚未生成；检查已存在的数据时，请用 `--manifest` 指定实际清单的**绝对路径**。
+合成点位误差4.3954→2.5242 px；0.85下可见/遮挡召回为91.33%/94.76%。用户判断真实演示合图整体相近，共同成功35帧的可用点对2474→3665。当前没有替换部署权重，也不继续训练。
 
-## 先看数据是否能读
+直接看图：在本项目目录用 `/mnt/data1/yy/home/yy/Repos/mamma/.venv/bin/python scripts/real_stitch_review_server.py --host 127.0.0.1 --port 18872`，打开 `http://127.0.0.1:18872/`。合图链的范围和局限见[真实演示合图报告](REAL_RIDING_STITCH_THRESHOLD085_20261025.md)。
 
-在项目目录运行：
+## 检查入口及历史实验
+
+下列16/4划分、500步和batch=1说明属于早期实验；普通CPU检查仍可使用禁止训练的mamma_regular.json。最终版本以以上交付入口为准。
+
+首轮数据入口是相邻项目的 20 个完整城市场景，包内各有 `observations.json`、RGB、目标人物 mask 和有序 512 点标签。每个人有独立观察；`absent` 留在统计里，训练只取 `observed`。模型输入框从目标 mask 算出。点坐标保留完整 ERP 语义，跨左右接缝时裁剪和误差采用周期横坐标。
+
+[固定划分](../configs/retrain/city_full_20261024_split.json)明确列出训练 16 个、验证 4 个数据包；每类的 v0005 作验证，其余四个完整场景作训练。`cycle_walk` 的训练场景为 v0001、v0002、v0004、v0006。路径逐包解析，不复制原图，也不把不同场景合成一个 episode。基础人物、动作和来源 manifest 可以在两侧复用；同一个 episode 或同一个数据包不能跨侧。
+
+从项目目录运行，先只做 CPU 检查：
 
 ```bash
 cd /mnt/data1/yy/home/yy/Projects/mamma_retrain
 MAMMA_PY=/mnt/data1/yy/home/yy/Repos/mamma/.venv/bin/python
-MANIFEST=/mnt/data1/yy/home/yy/Projects/human_data_generator/outputs/runs/first_current_render_a1_20261023_pair_walk_densekp_env/observations.json
+export PYTHON_DOTENV_DISABLED=1 PYTHONDONTWRITEBYTECODE=1 OPENBLAS_NUM_THREADS=1
 
-env CUDA_VISIBLE_DEVICES='' PYTHONDONTWRITEBYTECODE=1 PYTHON_DOTENV_DISABLED=1 OPENBLAS_NUM_THREADS=1 \
-  "$MAMMA_PY" scripts/mamma_retrain.py plan --manifest "$MANIFEST"
-
-env CUDA_VISIBLE_DEVICES='' PYTHONDONTWRITEBYTECODE=1 PYTHON_DOTENV_DISABLED=1 OPENBLAS_NUM_THREADS=1 \
-  "$MAMMA_PY" scripts/mamma_retrain.py check-data --manifest "$MANIFEST" --limit 2
+CUDA_VISIBLE_DEVICES='' "$MAMMA_PY" scripts/mamma_retrain.py plan \
+  --config configs/retrain/mamma_regular.json --split train
+CUDA_VISIBLE_DEVICES='' "$MAMMA_PY" scripts/mamma_retrain.py plan \
+  --config configs/retrain/mamma_regular.json --split validation
+CUDA_VISIBLE_DEVICES='' "$MAMMA_PY" scripts/mamma_retrain.py check-data \
+  --config configs/retrain/mamma_regular.json --split validation --limit 2
 ```
 
-`plan` 只核对清单、标签文件、身份时间、点序、分组和配置，不解码图片，也不加载模型。`check-data` 再读指定数量的 observed 样本，报告图片和 mask 形状、可监督坐标点数与可监督 visibility 点数；它仍不构造模型。上面的短真实渲染包有 8 个观察槽，其中 4 个 observed、4 个 absent。两个人在 frame 0/cam4 各有 512 个可监督坐标点，visibility 可监督点数分别为 135 和 164。
+`plan` 检查清单、包内文件、身份、时间和模板点序，不解码图片或加载模型。`check-data` 再读少量 RGB 和 mask。通用的 [mamma_regular.json](../configs/retrain/mamma_regular.json) 保持 `execution_authorized=false`；它不是可误触的训练配置。
 
-## 训练时哪些信号会起作用
+本轮实际模型对照使用 [mamma_city_full_20261024.json](../configs/retrain/mamma_city_full_20261024.json)，只对这份经过代表性遮挡检查的完整批次授权执行。运行必须另加 `--execute`、显式输出新目录和设备。先在固定四场景验证集上评估原权重，再训练到第 25 次有效更新并保存 checkpoint；新进程从该 checkpoint 继续到累计 500 次，最终用**同一验证集**评估。命令和实际结果见 [本轮实验记录](CITY_FULL_FIRST_FINETUNE_20261024.md)。训练用 AdamW、学习率 1e-5、batch size 1；计划中的 500 指真正执行优化器的次数，空监督样本不计入。
 
-坐标与 uncertainty 一起计算损失。可见性只在标签为 `0` 或 `1` 且该点坐标有效时计算损失；`-1` 只跳过可见性损失，不自动取消可靠坐标的监督。人与人接触、地面接触没有训练标签和损失。原权重需要的接触头仍在模型里，但参数被冻结且不进入优化器；共享 decoder 若被更新，这些头的输出仍可能变化。
+另有一份[可见性类均衡 500 步配置](../configs/retrain/mamma_city_full_visibility_class_mean_20261024.json)，它只把 visibility 的逐样本 BCE 归约从 `point_mean` 改为 `class_mean`。固定数据、三模型指标和 checkpoint 见[类均衡对照记录](VISIBILITY_CLASS_MEAN_20261024.md)。历史 checkpoint 只作经过来源核对的模型权重读取，不接入新实验的优化器或恢复状态。
 
-同一 episode、相同资产 ID 或相同源 manifest ID 不得同时出现在训练和验证集。这里不自动识别同一次动作录制的不同片段，也不增加额外分组任务。
+当前的[30% 遮挡取样配置](../configs/retrain/mamma_city_full_occlusion_30pct_20261025.json)沿用类均衡损失，从原始权重另训 500 次；固定顺序在[取样计划](../outputs/experiments/city_full_occlusion_30pct_20261025/sampling_plan.json)。每十次更新安排三条有有效遮挡监督的训练观察，其余七条来自其他观察；不会改变验证集分布。四模型指标、命令和局限见[30% 取样对照记录](OCCLUSION_30PCT_20261025.md)。普通检查依旧使用禁止执行的 `mamma_regular.json`，不会自动训练。
 
-当前训练配置是 `mamma_training_v3`，reader 配置是 `mamma_reader_v2`，裁剪能力声明为 `mask_bbox_periodic_v2`。`loss_enabled.visibility` 是可见性损失及该头优化器成员的唯一开关。它现在为 `true`，但 `execution_authorized=false`，而可信遮挡负例资格仍是 `pending_representative_negative_evidence`。因此上面的 `plan`、`check-data` 可运行，**当前配置不能执行训练**。早期小试的 604 个正例、0 个可信负例、3492 个 unknown 只是历史基准；新四类关键帧出现了候选遮挡负例，也仍需代表性资格核查。
+新一轮[合并数据配置](../configs/retrain/mamma_city_full_plus_occlusion_30pct_20261025.json)把原训练 16 场景与新遮挡训练 12 场景合并，仍从原始权重进行 500 次 `class_mean`、30% 遮挡取样更新。主要看它相对**未微调原模型**的效果：两组验证的点位误差明显下降，可见召回上升，遮挡召回下降；[报告](CITY_MERGED_OCCLUSION_30PCT_20261025.md)先给这组主对照，再用旧数据 30% 模型分析新增数据的额外作用。旧 435 条验证与新 379 条遮挡验证分开评价。跨验证集只读评价可重复传入 `--eval-manifest` 指定新包；训练恢复仍严格绑定原配置、数据和取样计划。
 
-未来在数据资格和执行条件另行确认后，仍使用 `scripts/mamma_retrain.py train`，明确传入训练清单、互不交叉的验证清单、输出目录、设备、更新预算、checkpoint 间隔和 `--execute`。`evaluate` 也需要显式执行条件。正常恢复文件使用 `mamma_regular_resume_v4`，严格校验配置与数据合同，并保存模型、优化器、随机数状态、更新次数和下一个采样位置。当前没有用真实 MAMMA 网络验证新恢复路径。
+现行[完整一遍配置](../configs/retrain/mamma_city_merged_one_epoch_20261025.json)仍从原权重开始，但把合并训练集里有监督的 3245 条观察各训练一次，不设遮挡配额。它使用真实 batch 4，共 812 次优化器更新，尾批 1 条。现在以原 4 个加新增 3 个场景组成的**统一 814 条验证集**为主结果；[统一划分](../configs/retrain/city_merged_unified_validation_20261025_split.json)供以后新实验直接使用。[训练与对照报告](CITY_MERGED_FULL_EPOCH_20261025.md)显示相对原模型，ERP 点均误差 4.3954→2.5242 px、可见召回 82.64%→98.42%，但遮挡召回 95.73%→85.94%。统一[对照数据](../outputs/experiments/city_merged_one_epoch_20261025/combined_validation_comparison.json)直接从逐样本预测重算，保留七份包和各类明细；完成一遍后已停止，没有自动进入第二轮。
 
-想顺着代码阅读实现，请看 [源码阅读指南](CODE_GUIDE.md)。历史小试报告和产物保留作证据，不作为当前运行入口。
+坐标与 uncertainty 联合学习。visibility 只用 `0/1`，跳过 `-1`；未知或遮挡不会自动取消可靠坐标监督。人与人接触和地面接触不作为标签或损失，原权重所需的对应头保留并冻结。基于 [遮挡抽查](../outputs/experiments/city_full_first_finetune_20261024/OCCLUSION_CHECK.md) 开放的 visibility 资格只适用于本次有界实验，不代表全批逐点人工认证或真实拍摄泛化。
+
+源码入口与修改位置见 [CODE_GUIDE.md](CODE_GUIDE.md)。
+
+真实骑行图片没有人工 512 点真值。同帧 cam2/cam4 的[点位人工对照](REAL_RIDING_MANUAL_REVIEW_20261024.md)现以“原模型阈值 0.5 vs 合并数据全量一遍阈值 0.85”为默认独立评审组，旧 0.5 评分保留。想直接看最终画面，可按[真实双机演示合图说明](REAL_RIDING_STITCH_THRESHOLD085_20261025.md)启动本地页面，并排查看固定 40 对的原模型与 0.85 方案。用户目前的总体画面判断是两者效果相近，0.85 方案可用点更多；这不等于真实点位准确率的真值评价。当前运行中的旧服务不会自动加载新页面代码。

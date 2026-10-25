@@ -1,0 +1,27 @@
+{
+  "schema": "mamma_data_split_v1",
+  "train": [
+    "../../../human_data_generator/outputs/runs/city_full_20261024_one_cycle_v0001/observations.json",
+    "../../../human_data_generator/outputs/runs/city_full_20261024_one_cycle_v0002/observations.json",
+    "../../../human_data_generator/outputs/runs/city_full_20261024_one_cycle_v0003/observations.json",
+    "../../../human_data_generator/outputs/runs/city_full_20261024_one_cycle_v0004/observations.json",
+    "../../../human_data_generator/outputs/runs/city_full_20261024_two_cycle_v0001/observations.json",
+    "../../../human_data_generator/outputs/runs/city_full_20261024_two_cycle_v0002/observations.json",
+    "../../../human_data_generator/outputs/runs/city_full_20261024_two_cycle_v0003/observations.json",
+    "../../../human_data_generator/outputs/runs/city_full_20261024_two_cycle_v0004/observations.json",
+    "../../../human_data_generator/outputs/runs/city_full_20261024_cycle_walk_v0001/observations.json",
+    "../../../human_data_generator/outputs/runs/city_full_20261024_cycle_walk_v0002/observations.json",
+    "../../../human_data_generator/outputs/runs/city_full_20261024_cycle_walk_v0004_retry1/observations.json",
+    "../../../human_data_generator/outputs/runs/city_full_20261024_cycle_walk_v0006/observations.json",
+    "../../../human_data_generator/outputs/runs/city_full_20261024_three_cycle_v0001/observations.json",
+    "../../../human_data_generator/outputs/runs/city_full_20261024_three_cycle_v0002_retry1/observations.json",
+    "../../../human_data_generator/outputs/runs/city_full_20261024_three_cycle_v0003/observations.json",
+    "../../../human_data_generator/outputs/runs/city_full_20261024_three_cycle_v0004/observations.json"
+  ],
+  "validation": [
+    "../../../human_data_generator/outputs/runs/city_full_20261024_one_cycle_v0005/observations.json",
+    "../../../human_data_generator/outputs/runs/city_full_20261024_two_cycle_v0005/observations.json",
+    "../../../human_data_generator/outputs/runs/city_full_20261024_cycle_walk_v0005/observations.json",
+    "../../../human_data_generator/outputs/runs/city_full_20261024_three_cycle_v0005/observations.json"
+  ]
+}

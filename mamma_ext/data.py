@@ -1,4 +1,4 @@
-"""Read one portable MAMMA bundle; source meshes and motions are never needed."""
+"""Read portable MAMMA bundles; source meshes and motions are never needed."""
 
 import json
 from pathlib import Path
@@ -10,7 +10,6 @@ import torch
 from .upstream import DEFAULT_MEAN, DEFAULT_STD, crop_math
 
 _, gen_trans_from_patch_cv = crop_math()
-READER_SCHEMA = "mamma_reader_v2"
 BUNDLE_SCHEMA = "mamma_bundle_v1"
 TEMPLATE_ID = "MAMMA_verts_512_ordered_v1"
 
@@ -49,7 +48,7 @@ def periodic_mask_box(mask, offset, width):
     return np.array([start, offset[1] + rows[0], end, offset[1] + rows[-1]], np.int64)
 
 
-def native_plan(box, roi, stored, full, *, periodic_x=False):
+def native_plan(box, roi, stored, full, *, periodic_x=False, vertical_pad_black=False):
     """Require the whole expanded crop and Gaussian filter support inside ROI."""
     box = np.asarray(box, np.float32)
     roi = np.asarray(roi, np.int64)
@@ -82,9 +81,13 @@ def native_plan(box, roi, stored, full, *, periodic_x=False):
         if (
             roi[0] != 0
             or roi[2] != full[0]
-            or rect[1] < roi[1]
-            or rect[3] > roi[3]
             or rect[2] - rect[0] > full[0]
+            or (
+                vertical_pad_black
+                and (rect[1] >= roi[3] or rect[3] <= roi[1]
+                     or rect[3] - rect[1] > 2 * full[1])
+            )
+            or (not vertical_pad_black and (rect[1] < roi[1] or rect[3] > roi[3]))
         ):
             raise ValueError("crop_filter_support_outside_roi")
     elif np.any(rect[:2] < roi[:2]) or np.any(rect[2:] > roi[2:]):
@@ -171,15 +174,8 @@ def _check_saved_labels(row, files, bundle, template):
             raise ValueError("saved_gt_identity_time_or_template_conflict")
 
 
-def _load_bundle(config_path, manifest_override):
-    config_path = Path(config_path).resolve()
-    config = json.loads(config_path.read_text())
-    if set(config) != {"schema", "manifest"} or config["schema"] != READER_SCHEMA:
-        raise ValueError("current_reader_config_required")
-    manifest = Path(manifest_override or config["manifest"])
-    if not manifest.is_absolute():
-        manifest = config_path.parent / manifest
-    manifest = manifest.resolve()
+def _load_bundle(manifest):
+    manifest = Path(manifest).resolve()
     bundle = json.loads(manifest.read_text())
     if bundle.get("schema") != BUNDLE_SCHEMA:
         raise ValueError("current_bundle_required")
@@ -204,10 +200,11 @@ def _load_bundle(config_path, manifest_override):
         or np.any(template >= 10475)
     ):
         raise ValueError("invalid_template_point_order")
-    return config, manifest, bundle, template
+    return manifest, bundle, template
 
 
-def _crop_raster(image, mask, roi, full, support):
+def _crop_raster(image, mask, roi, full, support=None, *, periodic_x=None,
+                 vertical_pad_black=False):
     stored = roi[2:] - roi[:2]
     if (
         image is None
@@ -216,14 +213,20 @@ def _crop_raster(image, mask, roi, full, support):
         or mask.shape != image.shape[:2]
     ):
         raise ValueError("stored_raster_size_conflict")
-    periodic_x = support["crop_policy_version"] == "mask_bbox_periodic_v2"
+    if periodic_x is None:
+        periodic_x = support["crop_policy_version"] == "mask_bbox_periodic_v2"
     box = (
         periodic_mask_box(mask, roi[:2], int(full[0]))
         if periodic_x
         else mask_box_inclusive(mask, roi[:2])
     )
-    center, size, sigma, rect = native_plan(box, roi, stored, full, periodic_x=periodic_x)
-    if (
+    if vertical_pad_black and (not periodic_x or roi.tolist() != [0, 0, int(full[0]), int(full[1])]):
+        raise ValueError("vertical_padding_requires_full_periodic_erp")
+    center, size, sigma, rect = native_plan(
+        box, roi, stored, full, periodic_x=periodic_x,
+        vertical_pad_black=vertical_pad_black,
+    )
+    if support is not None and (
         support["box_xyxy"] != box.tolist()
         or support["sampling_rect_erp"] != rect.tolist()
         or not support["source_sampling_supported"]
@@ -233,8 +236,20 @@ def _crop_raster(image, mask, roi, full, support):
     x0, y0, x1, y1 = rect - np.tile(roi[:2], 2)
     if periodic_x:
         columns = np.arange(rect[0], rect[2]) % int(full[0])
-        local_image = image[y0:y1][:, columns]
-        local_mask = mask[y0:y1][:, columns]
+        if vertical_pad_black and (y0 < 0 or y1 > image.shape[0]):
+            source_top, source_bottom = max(0, y0), min(image.shape[0], y1)
+            destination_top = source_top - y0
+            local_image = np.zeros((y1 - y0, len(columns), 3), dtype=image.dtype)
+            local_mask = np.zeros((y1 - y0, len(columns)), dtype=mask.dtype)
+            local_image[destination_top:destination_top + source_bottom - source_top] = (
+                image[source_top:source_bottom][:, columns]
+            )
+            local_mask[destination_top:destination_top + source_bottom - source_top] = (
+                mask[source_top:source_bottom][:, columns]
+            )
+        else:
+            local_image = image[y0:y1][:, columns]
+            local_mask = mask[y0:y1][:, columns]
     else:
         local_image = image[y0:y1, x0:x1]
         local_mask = mask[y0:y1, x0:x1]
@@ -269,6 +284,34 @@ def _crop_raster(image, mask, roi, full, support):
     return rgb, mask_patch, affine, box
 
 
+def real_erp_input(image, mask):
+    """Use the saved-GT crop numerics for a real full ERP without inventing GT."""
+    if image is None or image.ndim != 3 or image.shape[2] != 3:
+        raise ValueError("invalid_real_erp_image")
+    height, width = image.shape[:2]
+    roi = np.array([0, 0, width, height], dtype=np.int64)
+    full = np.array([width, height], dtype=np.int64)
+    rgb, mask_patch, affine, box = _crop_raster(
+        image, mask, roi, full, periodic_x=True, vertical_pad_black=True
+    )
+    _, _, _, sampling_rect = native_plan(
+        box, roi, full, full, periodic_x=True, vertical_pad_black=True
+    )
+    return {
+        "img": rgb,
+        "mask": mask_patch[None].astype(np.float32) / 255,
+        "affine_erp_to_model": affine,
+        "affine_model_to_erp": cv2.invertAffineTransform(affine),
+        "parent_box_xyxy": box,
+        "roi_xyxy": roi,
+        "full_size_wh": full,
+        "periodic_x": True,
+        "vertical_padding_top_bottom": [
+            max(0, -int(sampling_rect[1])), max(0, int(sampling_rect[3]) - height)
+        ],
+    }
+
+
 def _targets(files, person_index, affine, roi, box, periodic_x):
     with np.load(files["labels"], allow_pickle=False) as gt:
         xy = gt["xy_full_erp"][person_index].astype(np.float64)
@@ -291,33 +334,54 @@ def _targets(files, person_index, affine, roi, box, periodic_x):
 
 
 class MammaSavedGTDataset(torch.utils.data.Dataset):
-    def __init__(self, config_path, manifest_override=None):
-        config, manifest, bundle, template = _load_bundle(config_path, manifest_override)
-        self.cfg = dict(config, manifest=str(manifest))
-        self.slots = bundle["observations"]
+    def __init__(self, manifests):
+        if not isinstance(manifests, list) or not manifests:
+            raise ValueError("nonempty_manifest_list_required")
+        resolved = [Path(path).resolve() for path in manifests]
+        if len(set(resolved)) != len(resolved):
+            raise ValueError("duplicate_data_package")
+        self.cfg = {"manifests": [str(path) for path in resolved]}
+        self.slots = []
         self.ready = []
         self._files = []
         seen = set()
-        for index, row in enumerate(self.slots):
-            _check_observation(row, bundle, seen)
-            files = _bundle_files(manifest, row)
-            self._files.append(files)
-            _check_saved_labels(row, files, bundle, template)
-            if row["status"] == "observed":
-                if (
-                    row["crop_support"] is None
-                    or row["crop_support"]["crop_policy_version"]
-                    not in ("mask_bbox_inclusive_v1", "mask_bbox_periodic_v2")
-                    or (
-                        row["crop_support"]["crop_policy_version"] == "mask_bbox_periodic_v2"
-                        and row["roi_xyxy"][0::2] != [0, row["full_image_size_wh"][0]]
-                    )
-                ):
-                    raise ValueError("missing_mask_crop_support")
-                self.ready.append(index)
-            elif row["crop_support"] is not None:
-                raise ValueError("absent_slot_has_crop")
-        self.vertex_ids = template
+        seen_ids = set()
+        seen_episodes = set()
+        template_order = None
+        for path in resolved:
+            manifest, bundle, template = _load_bundle(path)
+            if bundle["episode"] in seen_episodes:
+                raise ValueError("duplicate_episode_package")
+            seen_episodes.add(bundle["episode"])
+            if template_order is None:
+                template_order = template
+            elif not np.array_equal(template_order, template):
+                raise ValueError("bundle_template_order_conflict")
+            for row in bundle["observations"]:
+                _check_observation(row, bundle, seen)
+                if row["observation_id"] in seen_ids:
+                    raise ValueError("duplicate_observation_id")
+                seen_ids.add(row["observation_id"])
+                files = _bundle_files(manifest, row)
+                self._files.append(files)
+                _check_saved_labels(row, files, bundle, template)
+                index = len(self.slots)
+                self.slots.append(row)
+                if row["status"] == "observed":
+                    if (
+                        row["crop_support"] is None
+                        or row["crop_support"]["crop_policy_version"]
+                        not in ("mask_bbox_inclusive_v1", "mask_bbox_periodic_v2")
+                        or (
+                            row["crop_support"]["crop_policy_version"] == "mask_bbox_periodic_v2"
+                            and row["roi_xyxy"][0::2] != [0, row["full_image_size_wh"][0]]
+                        )
+                    ):
+                        raise ValueError("missing_mask_crop_support")
+                    self.ready.append(index)
+                elif row["crop_support"] is not None:
+                    raise ValueError("absent_slot_has_crop")
+        self.vertex_ids = template_order
 
     def __len__(self):
         return len(self.ready)

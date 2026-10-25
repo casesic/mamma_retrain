@@ -6,7 +6,8 @@ import torch.nn.functional as F
 TASKS = ("coordinate", "visibility")
 
 
-def masked_task_loss(pred, batch, enabled, coordinate_scale=100.0, residual_cap=25.0):
+def masked_task_loss(pred, batch, enabled, coordinate_scale=100.0, residual_cap=25.0,
+                     visibility_reduction="point_mean"):
     """Per-sample valid-weight mean, then mean over labeled samples.
 
     Input arrays are batched tensors. Unknown -1 and invalid NaNs are never indexed.
@@ -14,6 +15,8 @@ def masked_task_loss(pred, batch, enabled, coordinate_scale=100.0, residual_cap=
     then add weight * 2 log sigma. Here all point weights are one.
     """
     anchor = pred["joints2d"]
+    if visibility_reduction not in ("point_mean", "class_mean"):
+        raise ValueError("invalid_visibility_reduction")
     zero = anchor.new_zeros(())
     losses = {}
     counts = {}
@@ -55,7 +58,14 @@ def masked_task_loss(pred, batch, enabled, coordinate_scale=100.0, residual_cap=
                 if not torch.isfinite(logits).all():
                     raise ValueError("nonfinite_valid_logit_" + task)
                 bce = F.binary_cross_entropy_with_logits(logits, label, reduction="none")
-                per_sample.append(bce.mean())
+                if visibility_reduction == "point_mean":
+                    per_sample.append(bce.mean())
+                else:
+                    positive = label == 1
+                    negative = label == 0
+                    class_means = [bce[mask].mean() for mask in (positive, negative)
+                                   if torch.any(mask)]
+                    per_sample.append(torch.stack(class_means).mean())
         losses[task] = torch.stack(per_sample).mean()
     active = [task for task in TASKS if enabled[task] and counts[task]["points"]]
     total = sum((losses[task] for task in active), zero)

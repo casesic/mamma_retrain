@@ -16,16 +16,21 @@
     ],
     "weight_decay": 0.0001
   },
-  "schema": "mamma_training_v3",
-  "input_config": "mamma_saved_gt_reader.json",
+  "schema": "mamma_training_v6",
+  "input_config": "city_full_20261024_split.json",
   "crop_policy_version": "mask_bbox_periodic_v2",
   "augmentation": "off",
   "loss_enabled": {
     "coordinate": true,
     "visibility": true
   },
+  "visibility_reduction": "point_mean",
   "execution_authorized": false,
   "label_qualification": "pending_representative_negative_evidence",
   "model_config": "../../landmarks/configs/train/models_2d/config_mammanet_mask_512.yaml",
-  "tensor_state": "../../outputs/experiments/mamma_original_baseline_pilot_20261015/tensor_state.pt"
+  "tensor_state": "../../outputs/experiments/mamma_original_baseline_pilot_20261015/tensor_state.pt",
+  "sampler_seed": 20261024,
+  "sampling": {
+    "mode": "episode_round_robin"
+  }
 }

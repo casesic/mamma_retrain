@@ -70,6 +70,11 @@ def model_config_summary(cfg):
 
 def strict_model_from_tensors(cfg, tensor_state_path):
     """Only tensor-only weights_only input; compare exact names/shapes before strict load."""
+    import sys
+
+    model_root = str(Path(__file__).resolve().parents[1] / "landmarks")
+    if model_root not in sys.path:
+        sys.path.insert(0, model_root)
     from lib.models import build_model  # Heavy upstream import only in explicit model path.
 
     state = torch.load(tensor_state_path, map_location="cpu", weights_only=True)

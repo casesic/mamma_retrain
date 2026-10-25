@@ -6,6 +6,7 @@ import random
 import tempfile
 import unittest
 from types import SimpleNamespace
+from unittest.mock import patch
 
 import numpy as np
 import torch
@@ -17,14 +18,17 @@ from mamma_ext.policy import (
     load_active_policy,
 )
 from mamma_ext.model import restore_xy, summarize_errors
-from mamma_ext.data import periodic_mask_box, native_plan, _crop_raster
+from mamma_ext.data import periodic_mask_box, native_plan, _crop_raster, real_erp_input
 from mamma_ext.recovery import (
     capture_rng,
     load_evaluation_boundary,
+    load_frozen_20261024_point_mean_state,
     load_regular_boundary,
     save_regular_boundary,
 )
-from mamma_ext.runner import _execution_preflight
+from mamma_ext.runner import _execution_preflight, _tensor_batch, mixed_order
+from mamma_ext.sampler import (make_occlusion_plan, load_occlusion_plan,
+                               make_one_epoch_plan, load_one_epoch_plan)
 from mamma_ext.split import validate_disjoint
 from mamma_ext.upstream import crop_math
 
@@ -76,6 +80,7 @@ def tiny_bundle(root):
     np.savez(root / "labels.npz", **label)
     np.savez(root / "annotations.npz", **annotation)
     row = dict(
+        observation_id="fixture_target",
         episode="fixture",
         rig="rig_side",
         frame_index=3,
@@ -108,16 +113,162 @@ def tiny_bundle(root):
         observations=[row],
     )
     write_json(root / "observations.json", bundle)
-    write_json(root / "reader.json", {"schema": "mamma_reader_v2", "manifest": "observations.json"})
     return bundle, label, annotation
 
 
 class CurrentRetrainTest(unittest.TestCase):
+    def test_one_epoch_plan_real_batch_and_resume_contract(self):
+        slots = [{"observation_id": f"obs_{i}", "episode": f"episode_{i % 3}",
+                  "person_id": i % 2 + 1, "frame_index": i} for i in range(9)]
+        class Fixture:
+            def __len__(self):
+                return len(self.ready)
+        dataset = Fixture()
+        dataset.slots, dataset.ready = slots, list(range(9))
+        dataset.cfg = {"manifests": ["train_fixture"]}
+        with patch("mamma_ext.sampler.label_counts", side_effect=lambda _, i: {
+            "coordinates": 0 if i == 8 else 3,
+            "positive": 0 if i in (7, 8) else 2,
+            "negative": 1 if i == 0 else 0,
+        }):
+            plan = make_one_epoch_plan(dataset, 20261024)
+            self.assertEqual(len(plan["entries"]), 8)
+            self.assertEqual([r["observation_id"] for r in plan["excluded_no_supervision"]], ["obs_8"])
+            self.assertEqual(len(set(row["observation_id"] for row in plan["entries"])), 8)
+            self.assertEqual(plan, make_one_epoch_plan(dataset, 20261024))
+            with tempfile.TemporaryDirectory() as temp:
+                path = Path(temp) / "plan.json"
+                write_json(path, plan)
+                self.assertEqual(load_one_epoch_plan(path, dataset, 20261024), plan)
+                rows = plan["entries"]
+                batches = [rows[i:i + 3] for i in range(0, len(rows), 3)]
+                self.assertEqual([len(batch) for batch in batches], [3, 3, 2])
+                self.assertEqual([r["observation_id"] for b in batches for r in b],
+                                 [r["observation_id"] for r in rows])
+
+                refs = {key: "fixture" for key in (
+                    "config", "model_config", "tensor_state", "crop_policy_version",
+                    "gt_policy", "augmentation", "training_schema", "visibility_reduction",
+                    "sampling_plan_id")}
+                refs.update(train_manifests=["train_fixture"], validation_manifests=["val_fixture"],
+                            model_config=str(Path("fixture").resolve()),
+                            tensor_state=str(Path("fixture").resolve()),
+                            gt_policy="saved_mamma_512_npz_v1",
+                            sampling_plan_id=plan["plan_id"],
+                            loss_enabled={"coordinate": True, "visibility": True},
+                            optimizer={"type": "AdamW"}, sampler_seed=20261024,
+                            sampling={"mode": "one_epoch_v1", "plan": str(path)},
+                            training_schema="mamma_training_v7", batch_size=3)
+                model = torch.nn.Linear(2, 1)
+                optimizer = torch.optim.AdamW(model.parameters())
+                checkpoint = Path(temp) / "checkpoint.pt"
+                save_regular_boundary(checkpoint, model, optimizer, 2, capture_rng(),
+                                      {"seed": 20261024, "epoch": 0, "next_position": 6}, refs)
+                restored = load_regular_boundary(checkpoint, model, optimizer, refs)
+                self.assertEqual((restored["global_update"], restored["sampler"]["next_position"]), (2, 6))
+                with self.assertRaisesRegex(ValueError, "regular_resume_schema_or_refs_mismatch"):
+                    load_regular_boundary(checkpoint, model, optimizer, dict(refs, batch_size=4))
+                evaluation_config = {
+                    "model_config": refs["model_config"], "tensor_state": refs["tensor_state"],
+                    "crop_policy_version": refs["crop_policy_version"],
+                    "augmentation": refs["augmentation"], "schema": refs["training_schema"],
+                    "loss_enabled": refs["loss_enabled"],
+                    "visibility_reduction": refs["visibility_reduction"],
+                    "optimizer": refs["optimizer"], "sampler_seed": refs["sampler_seed"],
+                    "sampling": refs["sampling"], "batch_size": 3,
+                }
+                load_evaluation_boundary(checkpoint, model, evaluation_config, ["val_fixture"])
+                with self.assertRaisesRegex(ValueError, "evaluation_checkpoint_contract_mismatch"):
+                    load_evaluation_boundary(checkpoint, model,
+                                             dict(evaluation_config, batch_size=4), ["val_fixture"])
+
+        item = {"img": np.zeros((3, 2, 2), np.float32), "mask": np.zeros((1, 2, 2), np.float32),
+                "xy_target": np.zeros((2, 2), np.float32),
+                "coordinate_loss_valid": np.array([True, False]),
+                "visibility": np.array([1, -1]),
+                "visibility_loss_valid": np.array([True, False])}
+        batch = _tensor_batch([item, item, item], torch.device("cpu"))
+        self.assertEqual(tuple(batch["img"].shape), (3, 3, 2, 2))
+        self.assertEqual(tuple(batch["visibility"].shape), (3, 2))
+
+    def test_batch_loss_uses_task_specific_sample_means(self):
+        from mamma_ext.tasks import masked_task_loss
+        prediction = {"joints2d": torch.tensor([[[.1, 0., 0.], [.2, 0., 0.]],
+                                                   [[.3, 0., 0.], [.4, 0., 0.]]]),
+                      "visibility": torch.tensor([[[.5], [-.5]], [[.8], [.9]]])}
+        batch = {"xy_target": torch.zeros((2, 2, 2)),
+                 "coordinate_loss_valid": torch.tensor([[True, True], [True, False]]),
+                 "visibility": torch.tensor([[1, 0], [-1, -1]]),
+                 "visibility_loss_valid": torch.tensor([[True, True], [False, False]])}
+        config = json.loads((ROOT / "configs/retrain/mamma_city_merged_one_epoch_20261025.json").read_text())
+        whole = active_task_loss(prediction, batch, config)
+        singles = [{key: value[i:i + 1] for key, value in batch.items()} for i in range(2)]
+        pred_singles = [{key: value[i:i + 1] for key, value in prediction.items()} for i in range(2)]
+        losses = [active_task_loss(pred_singles[i], singles[i], config) for i in range(2)]
+        self.assertTrue(torch.allclose(whole["parts"]["coordinate"],
+                                       (losses[0]["parts"]["coordinate"] + losses[1]["parts"]["coordinate"]) / 2))
+        self.assertTrue(torch.allclose(whole["parts"]["visibility"], losses[0]["parts"]["visibility"]))
+
+    def test_one_epoch_policy_rejects_missing_or_invalid_batch(self):
+        source = ROOT / "configs/retrain/mamma_city_merged_one_epoch_20261025.json"
+        config, dataset = load_active_policy(source, "validation")
+        self.assertEqual((config["batch_size"], len(dataset)), (4, 435))
+        with tempfile.TemporaryDirectory(dir=source.parent) as temp:
+            path = Path(temp) / "invalid.json"
+            for bad in (0, -1, True, "4"):
+                altered = json.loads(source.read_text())
+                altered["batch_size"] = bad
+                write_json(path, altered)
+                with self.assertRaisesRegex(ValueError, "invalid_training_batch_size"):
+                    load_active_policy(path)
+            altered = json.loads(source.read_text())
+            del altered["batch_size"]
+            write_json(path, altered)
+            with self.assertRaisesRegex(ValueError, "unsupported_active_training_policy"):
+                load_active_policy(path)
+
+    def test_fixed_occlusion_quota_plan_and_contract(self):
+        slots = [{"observation_id": f"sample_{i}", "episode": f"episode_{i % 4}",
+                  "person_id": i % 3 + 1, "frame_index": i // 12}
+                 for i in range(526)]
+        class FixtureDataset:
+            def __len__(self):
+                return len(self.ready)
+        dataset = FixtureDataset()
+        dataset.slots = slots
+        dataset.ready = list(range(526))
+        dataset.cfg = {"manifests": ["train_fixture"]}
+        def counts(_dataset, index):
+            return {"positive": 4, "negative": 2 if index < 126 else 0,
+                    "coordinates": 8}
+        with patch("mamma_ext.sampler.label_counts", side_effect=counts):
+            before = np.random.get_state()
+            plan = make_occlusion_plan(dataset, 20261024)
+            after = np.random.get_state()
+            np.testing.assert_array_equal(before[1], after[1])
+            self.assertEqual(plan, make_occlusion_plan(dataset, 20261024))
+            entries = plan["entries"]
+            self.assertEqual(len(entries), 500)
+            self.assertTrue(all(sum(row["pool"] == "occlusion" for row in entries[i:i+10]) == 3
+                                for i in range(0, 500, 10)))
+            occluded = [row["observation_id"] for row in entries
+                        if row["pool"] == "occlusion"]
+            self.assertEqual(len(set(occluded[:126])), 126)
+            self.assertEqual(len(set(row["observation_id"] for row in entries
+                                     if row["pool"] == "other")), 350)
+            with tempfile.TemporaryDirectory() as temp:
+                path = Path(temp) / "plan.json"
+                write_json(path, plan)
+                self.assertEqual(load_occlusion_plan(path, dataset, 20261024), plan)
+                changed = dict(plan, plan_id="wrong")
+                write_json(path, changed)
+                with self.assertRaisesRegex(ValueError, "sampling_plan_identity_or_data_mismatch"):
+                    load_occlusion_plan(path, dataset, 20261024)
     def test_bundle_identity_time_template_and_files_reject(self):
         with tempfile.TemporaryDirectory() as temp:
             root = Path(temp)
             bundle, label, annotation = tiny_bundle(root)
-            reader = root / "reader.json"
+            reader = [root / "observations.json"]
             self.assertEqual(len(MammaSavedGTDataset(reader)), 1)
 
             for changed, error in (
@@ -146,10 +297,10 @@ class CurrentRetrainTest(unittest.TestCase):
 
     def test_current_policy_relative_paths_and_old_schema_reject(self):
         config = ROOT / "configs/retrain/mamma_regular.json"
-        current, dataset = load_active_policy(config, manifest_override=REAL_MANIFEST)
-        self.assertEqual(current["schema"], "mamma_training_v3")
-        self.assertEqual(current["input_config"], str(config.parent / "mamma_saved_gt_reader.json"))
-        self.assertEqual(len(dataset), 4)
+        current, dataset = load_active_policy(config, split="validation")
+        self.assertEqual(current["schema"], "mamma_training_v6")
+        self.assertEqual(current["input_config"], str(config.parent / "city_full_20261024_split.json"))
+        self.assertEqual(len(dataset.cfg["manifests"]), 4)
         self.assertFalse(current["execution_authorized"])
         with tempfile.TemporaryDirectory() as temp:
             path = Path(temp) / "old.json"
@@ -158,7 +309,25 @@ class CurrentRetrainTest(unittest.TestCase):
             old["supervised_visibility"] = True
             write_json(path, old)
             with self.assertRaisesRegex(ValueError, "unsupported_active_training_policy"):
-                load_active_policy(path, manifest_override=REAL_MANIFEST)
+                load_active_policy(path)
+
+            for invalid in (None, "weighted_bce", 1):
+                malformed = json.loads(config.read_text())
+                malformed["visibility_reduction"] = invalid
+                write_json(path, malformed)
+                with self.assertRaisesRegex(ValueError, "unsupported_active_training_policy"):
+                    load_active_policy(path)
+            malformed = json.loads(config.read_text())
+            del malformed["visibility_reduction"]
+            write_json(path, malformed)
+            with self.assertRaisesRegex(ValueError, "unsupported_active_training_policy"):
+                load_active_policy(path)
+            malformed = json.loads(config.read_text())
+            malformed["sampling"] = {"mode": "occlusion_quota_v1", "total_updates": 500,
+                                     "occlusion_updates": 151, "plan": "schedule.json"}
+            write_json(path, malformed)
+            with self.assertRaisesRegex(ValueError, "unsupported_sampling_policy"):
+                load_active_policy(path)
 
             for task in ("coordinate", "visibility"):
                 for invalid in (0, 1, "true", None):
@@ -166,7 +335,7 @@ class CurrentRetrainTest(unittest.TestCase):
                     malformed["loss_enabled"][task] = invalid
                     write_json(path, malformed)
                     with self.assertRaisesRegex(ValueError, "task_loss_optimizer_mismatch"):
-                        load_active_policy(path, manifest_override=REAL_MANIFEST)
+                        load_active_policy(path)
 
     def test_loss_unknown_empty_and_optimizer_membership(self):
         prediction = dict(
@@ -232,6 +401,53 @@ class CurrentRetrainTest(unittest.TestCase):
         )
         self.assertFalse(model.decoder.vis_prob.weight.requires_grad)
 
+    def test_visibility_class_mean_formula_gradient_and_single_class(self):
+        from mamma_ext.tasks import masked_task_loss
+
+        logits = torch.tensor([[[0.5], [-0.7], [1.2], [9.0]]], requires_grad=True)
+        prediction = {"joints2d": torch.zeros((1, 4, 3)), "visibility": logits}
+        batch = {
+            "xy_target": torch.zeros((1, 4, 2)),
+            "coordinate_loss_valid": torch.zeros((1, 4), dtype=torch.bool),
+            "visibility": torch.tensor([[1, 0, 1, -1]]),
+            "visibility_loss_valid": torch.tensor([[True, True, True, False]]),
+        }
+        enabled = {"coordinate": False, "visibility": True}
+        bce = torch.nn.functional.binary_cross_entropy_with_logits(
+            logits[0, :3, 0], torch.tensor([1., 0., 1.]), reduction="none")
+        ordinary = masked_task_loss(prediction, batch, enabled, visibility_reduction="point_mean")
+        balanced = masked_task_loss(prediction, batch, enabled, visibility_reduction="class_mean")
+        self.assertTrue(torch.allclose(ordinary["loss"], bce.mean()))
+        self.assertTrue(torch.allclose(balanced["loss"],
+                                       .5 * bce[[0, 2]].mean() + .5 * bce[1]))
+        same_positive_logits = logits.detach().clone()
+        same_positive_logits[0, 2] = same_positive_logits[0, 0]
+        same_positive = {**prediction, "visibility": same_positive_logits}
+        duplicate = {**same_positive, "visibility": torch.cat((same_positive_logits,
+                                                                  same_positive_logits[:, :1]), dim=1)}
+        duplicate_batch = {**batch,
+                           "visibility": torch.tensor([[1, 0, 1, -1, 1]]),
+                           "visibility_loss_valid": torch.tensor([[True, True, True, False, True]]),
+                           "coordinate_loss_valid": torch.zeros((1, 5), dtype=torch.bool)}
+        duplicate["joints2d"] = torch.zeros((1, 5, 3))
+        duplicate_batch["xy_target"] = torch.zeros((1, 5, 2))
+        self.assertTrue(torch.allclose(
+            masked_task_loss(duplicate, duplicate_batch, enabled,
+                             visibility_reduction="class_mean")["loss"],
+            masked_task_loss(same_positive, batch, enabled,
+                             visibility_reduction="class_mean")["loss"]))
+        balanced["loss"].backward()
+        self.assertAlmostEqual(float(logits.grad[0, 0, 0] + logits.grad[0, 2, 0]),
+                               float(torch.sigmoid(logits[0, 0, 0]) / 4 +
+                                     torch.sigmoid(logits[0, 2, 0]) / 4 - .5), places=6)
+        self.assertEqual(float(logits.grad[0, 3, 0]), 0.)
+        batch["visibility_loss_valid"][0, 1] = False
+        single = masked_task_loss(prediction, batch, enabled, visibility_reduction="class_mean")
+        self.assertTrue(torch.allclose(single["loss"], bce[[0, 2]].mean()))
+        batch["visibility_loss_valid"][:] = False
+        self.assertTrue(masked_task_loss(prediction, batch, enabled,
+                                         visibility_reduction="class_mean")["skip_optimizer"])
+
     def test_current_resume_rng_sampler_and_contract(self):
         model = torch.nn.Linear(2, 1)
         optimizer = torch.optim.AdamW(model.parameters(), lr=1e-5)
@@ -244,8 +460,8 @@ class CurrentRetrainTest(unittest.TestCase):
         refs = dict.fromkeys(
             (
                 "config",
-                "train_manifest",
-                "validation_manifest",
+                "train_manifests",
+                "validation_manifests",
                 "model_config",
                 "tensor_state",
                 "crop_policy_version",
@@ -261,16 +477,23 @@ class CurrentRetrainTest(unittest.TestCase):
             crop_policy_version="mask_bbox_periodic_v2",
             gt_policy="saved_mamma_512_npz_v1",
             augmentation="off",
-            training_schema="mamma_training_v3",
+            training_schema="mamma_training_v6",
         )
         refs["loss_enabled"] = {"coordinate": True, "visibility": True}
+        refs["visibility_reduction"] = "class_mean"
+        refs["optimizer"] = {"type": "AdamW"}
+        refs["sampler_seed"] = 8
+        refs["sampling"] = {"mode": "episode_round_robin"}
+        refs["sampling_plan_id"] = "episode_round_robin"
+        refs["train_manifests"] = ["fixture_train"]
+        refs["validation_manifests"] = ["fixture_validation"]
         random.seed(8)
         np.random.seed(8)
         torch.manual_seed(8)
         with tempfile.TemporaryDirectory() as temp:
             path = Path(temp) / "checkpoint.pt"
             save_regular_boundary(
-                path, model, optimizer, 5, capture_rng(), {"epoch": 2, "next_position": 3}, refs
+                path, model, optimizer, 5, capture_rng(), {"seed": 8, "epoch": 2, "next_position": 3}, refs
             )
             expected = (random.random(), float(np.random.random()), float(torch.rand(())))
             original = {key: value.clone() for key, value in model.state_dict().items()}
@@ -280,9 +503,14 @@ class CurrentRetrainTest(unittest.TestCase):
             other = torch.optim.AdamW(model.parameters(), lr=2e-5)
             with self.assertRaisesRegex(ValueError, "regular_resume_schema_or_refs_mismatch"):
                 load_regular_boundary(path, model, other, dict(refs, training_schema="old"))
+            with self.assertRaisesRegex(ValueError, "regular_resume_schema_or_refs_mismatch"):
+                load_regular_boundary(path, model, other, dict(refs, visibility_reduction="point_mean"))
+            with self.assertRaisesRegex(ValueError, "regular_resume_schema_or_refs_mismatch"):
+                load_regular_boundary(path, model, other,
+                                      dict(refs, sampling_plan_id="different_plan"))
             result = load_regular_boundary(path, model, other, refs)
             self.assertEqual(
-                (result["global_update"], result["sampler"]), (5, {"epoch": 2, "next_position": 3})
+                (result["global_update"], result["sampler"]), (5, {"seed": 8, "epoch": 2, "next_position": 3})
             )
             for name, value in model.state_dict().items():
                 self.assertTrue(torch.equal(value, original[name]))
@@ -295,15 +523,20 @@ class CurrentRetrainTest(unittest.TestCase):
                 tensor_state="fixture",
                 crop_policy_version="mask_bbox_periodic_v2",
                 augmentation="off",
-                schema="mamma_training_v3",
+                schema="mamma_training_v6",
                 loss_enabled=refs["loss_enabled"],
+                visibility_reduction="class_mean",
+                optimizer=refs["optimizer"],
+                sampler_seed=8,
+                sampling={"mode": "episode_round_robin"},
             )
-            load_evaluation_boundary(path, model, evaluation_config)
+            load_evaluation_boundary(path, model, evaluation_config, ["fixture_validation"])
             with self.assertRaisesRegex(ValueError, "evaluation_checkpoint_contract_mismatch"):
                 load_evaluation_boundary(
                     path,
                     model,
                     dict(evaluation_config, loss_enabled={"coordinate": True, "visibility": False}),
+                    ["fixture_validation"],
                 )
             payload = torch.load(path, map_location="cpu", weights_only=True)
             payload["schema"] = "mamma_regular_resume_v2"
@@ -311,6 +544,17 @@ class CurrentRetrainTest(unittest.TestCase):
             torch.save(payload, old)
             with self.assertRaisesRegex(ValueError, "regular_resume_schema_or_refs_mismatch"):
                 load_regular_boundary(old, model, other, refs)
+            payload["schema"] = "mamma_regular_resume_v5"
+            payload["global_update"] = 500
+            payload["refs"]["training_schema"] = "mamma_training_v4"
+            del payload["refs"]["visibility_reduction"]
+            torch.save(payload, old)
+            load_frozen_20261024_point_mean_state(
+                old, model, dict(evaluation_config, visibility_reduction="point_mean"),
+                ["fixture_validation"])
+            with self.assertRaisesRegex(ValueError, "frozen_point_mean_model_contract_mismatch"):
+                load_frozen_20261024_point_mean_state(
+                    old, model, evaluation_config, ["fixture_validation"])
 
     def test_execution_still_requires_authorization(self):
         args = type(
@@ -334,14 +578,55 @@ class CurrentRetrainTest(unittest.TestCase):
             return SimpleNamespace(slots=[row], ready=[0])
 
         train = dataset("episode_a", "asset_a", "manifest_a")
-        validate_disjoint(train, dataset("episode_b", "asset_b", "manifest_b"))
-        for other, reason in (
-            (dataset("episode_a", "asset_b", "manifest_b"), "episodes"),
-            (dataset("episode_b", "asset_a", "manifest_b"), "source_assets"),
-            (dataset("episode_b", "asset_b", "manifest_a"), "source_manifests"),
-        ):
-            with self.assertRaisesRegex(ValueError, "train_validation_group_overlap_" + reason):
-                validate_disjoint(train, other)
+        validate_disjoint(train, dataset("episode_b", "asset_a", "manifest_a"))
+        with self.assertRaisesRegex(ValueError, "train_validation_group_overlap_episodes"):
+            validate_disjoint(train, dataset("episode_a", "asset_b", "manifest_b"))
+        validation = dataset("episode_b", "asset_b", "manifest_b")
+        validation.slots.append(dict(episode="episode_a", status="absent", absent_reason="empty_target_mask"))
+        with self.assertRaisesRegex(ValueError, "train_validation_group_overlap_episodes"):
+            validate_disjoint(train, validation)
+
+    def test_multibundle_and_mixed_order(self):
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            a = root / "a"
+            b = root / "b"
+            a.mkdir(); b.mkdir()
+            first, _, _ = tiny_bundle(a)
+            second, _, _ = tiny_bundle(b)
+            second["episode"] = "fixture_b"
+            second["observations"][0]["episode"] = "fixture_b"
+            second["observations"][0]["observation_id"] = "fixture_b_target"
+            with np.load(b / "labels.npz") as labels:
+                payload = {key: labels[key] for key in labels.files}
+            payload["scene_episode_id"] = np.array("fixture_b")
+            np.savez(b / "labels.npz", **payload)
+            with np.load(b / "annotations.npz") as annotations:
+                payload = {key: annotations[key] for key in annotations.files}
+            payload["scene_episode_id"] = np.array("fixture_b")
+            np.savez(b / "annotations.npz", **payload)
+            write_json(b / "observations.json", second)
+            dataset = MammaSavedGTDataset([a / "observations.json", b / "observations.json"])
+            self.assertEqual(len(dataset), 2)
+            self.assertEqual(set(mixed_order(dataset, 9, 0)), {0, 1})
+            self.assertEqual(mixed_order(dataset, 9, 0), mixed_order(dataset, 9, 0))
+            class Fake:
+                slots = [{"episode": f"scene_{i}"} for i in range(16) for _ in range(3)]
+                ready = list(range(48))
+
+                def __len__(self):
+                    return len(self.ready)
+
+            fake = Fake()
+            order = mixed_order(fake, 20261024, 0)
+            self.assertEqual(len(set(fake.slots[i]["episode"] for i in order[:16])), 16)
+            self.assertEqual(len(set(order)), 48)
+            self.assertEqual(order[25], mixed_order(fake, 20261024, 0)[25])
+            with self.assertRaisesRegex(ValueError, "duplicate_data_package"):
+                MammaSavedGTDataset([a / "observations.json"] * 2)
+            write_json(b / "observations.json", first)
+            with self.assertRaisesRegex(ValueError, "duplicate_episode_package"):
+                MammaSavedGTDataset([a / "observations.json", b / "observations.json"])
 
     def test_evaluation_restores_mask_derived_box_without_model(self):
         expand, affine_for_crop = crop_math()
@@ -431,6 +716,55 @@ class CurrentRetrainTest(unittest.TestCase):
         self.assertEqual(rgb.shape, (3, 512, 384))
         self.assertEqual(cropped_mask.shape, (512, 384))
         np.testing.assert_array_equal(used_box, box)
+
+    def test_real_erp_vertical_black_pad_and_strict_bundle_unchanged(self):
+        import cv2
+
+        height, width = 1024, 2048
+        image = np.zeros((height, width, 3), np.uint8)
+        top = np.zeros((height, width), np.uint8)
+        top[:100, :80] = 255
+        top[:100, -70:] = 255
+        image[900:, :, 2] = 255  # A wrong negative slice would import this red edge.
+        upper = real_erp_input(image, top)
+        self.assertGreater(upper["vertical_padding_top_bottom"][0], 0)
+        self.assertEqual(upper["vertical_padding_top_bottom"][1], 0)
+        self.assertTrue(np.isfinite(upper["img"]).all())
+        self.assertGreater(int(upper["mask"].sum()), 0)
+        from mamma_ext.upstream import DEFAULT_MEAN, DEFAULT_STD
+        self.assertAlmostEqual(float(upper["img"][0].max()),
+                               float(-DEFAULT_MEAN[0] / DEFAULT_STD[0]), places=5)
+        with self.assertRaisesRegex(ValueError, "crop_filter_support_outside_roi"):
+            _crop_raster(image, top, np.array([0, 0, width, height]),
+                         np.array([width, height]), periodic_x=True)
+        shifted = real_erp_input(np.roll(image, 700, axis=1), np.roll(top, 700, axis=1))
+        np.testing.assert_array_equal(upper["img"], shifted["img"])
+        np.testing.assert_array_equal(upper["mask"], shifted["mask"])
+        raw = np.zeros((512, 2), np.float32)
+        _, deployed, inverted = restore_xy(raw, upper)
+        np.testing.assert_allclose(deployed, inverted, atol=0.01)
+        assert np.isfinite(deployed).all()
+
+        bottom = np.zeros_like(top)
+        bottom[-100:, 800:950] = 255
+        lower = real_erp_input(image, bottom)
+        self.assertGreater(lower["vertical_padding_top_bottom"][1], 0)
+        self.assertEqual(lower["vertical_padding_top_bottom"][0], 0)
+        boundary_model = np.array([[[192., 511.]]], np.float32)
+        erp = cv2.transform(boundary_model, lower["affine_model_to_erp"])[0, 0]
+        self.assertGreater(erp[1], height)  # Do not clamp an outside prediction.
+
+        middle = np.zeros_like(top)
+        middle[380:650, 800:950] = 255
+        ordinary = real_erp_input(image, middle)
+        old_rgb, old_mask, old_affine, old_box = _crop_raster(
+            image, middle, np.array([0, 0, width, height]),
+            np.array([width, height]), periodic_x=True
+        )
+        np.testing.assert_array_equal(ordinary["img"], old_rgb)
+        np.testing.assert_array_equal(ordinary["mask"], old_mask[None].astype(np.float32) / 255)
+        np.testing.assert_array_equal(ordinary["affine_erp_to_model"], old_affine)
+        np.testing.assert_array_equal(ordinary["parent_box_xyxy"], old_box)
 
 
 if __name__ == "__main__":

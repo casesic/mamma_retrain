@@ -1,0 +1,680 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>真实骑行图片 · MAMMA 双相机对照</title>
+<style>
+:root { font-family: system-ui, sans-serif; color: #182231; background: #f2f5f8; }
+body { margin: 0; }
+header, main { max-width: 1800px; margin: auto; padding: 14px 22px; }
+header { background: #fff; border-bottom: 1px solid #d9e0e8; }
+h1 { font-size: 1.35rem; margin: 0 0 6px; }
+p { line-height: 1.5; margin: 6px 0; }
+.warning { color: #744b00; }
+.toolbar, .controls, .ratings, .nav { display: flex; gap: 10px; align-items: end; flex-wrap: wrap; }
+.toolbar, .ratings, .notice, .summary { background: #fff; border: 1px solid #d9e0e8; border-radius: 8px; padding: 12px; margin: 10px 0; }
+label { display: flex; flex-direction: column; gap: 4px; font-size: .9rem; }
+label.check { flex-direction: row; align-items: center; }
+select, button, textarea { font: inherit; padding: 6px 8px; }
+button { cursor: pointer; border: 1px solid #bac8d5; border-radius: 5px; background: #fff; }
+button:hover { background: #e9f3ff; }
+button:focus-visible, select:focus-visible, textarea:focus-visible { outline: 3px solid #2775cb; }
+.pictures { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
+.paired { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; margin: 10px 0; }
+.pair-canvas { width: 100%; display: block; background: #1c2734; cursor: grab; touch-action: none; }
+.pair-canvas:active { cursor: grabbing; }
+.pair-info { min-height: 1.3em; }
+.pair-heading { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.pair-heading label { flex-direction: row; align-items: center; }
+.pair-selected { border-color: #2775cb; box-shadow: inset 0 0 0 2px #2775cb; }
+.panel { background: #fff; border: 1px solid #d9e0e8; border-radius: 8px; padding: 8px; min-width: 0; }
+.panel h2 { font-size: 1rem; margin: 4px 0 8px; }
+.panel canvas { width: 100%; aspect-ratio: 1; display: block; background: #1c2734; cursor: grab; touch-action: none; }
+.panel canvas.pair-canvas { aspect-ratio: 2 / 1; height: auto; }
+.context { width: min(100%, 680px); background: #fff; border: 1px solid #d9e0e8; border-radius: 8px; padding: 8px; margin: 10px 0; }
+.context canvas { width: 100%; aspect-ratio: 2; background: #1c2734; display: block; }
+textarea { width: min(720px, 95%); min-height: 50px; }
+.hint { font-size: .83rem; color: #596779; }
+#pointInfo { min-height: 1.3em; }
+@media (max-width: 1100px) { .paired { grid-template-columns: 1fr; } }
+@media (max-width: 900px) { .pictures { grid-template-columns: 1fr; } .panel canvas { max-height: 520px; } }
+</style>
+</head>
+<body>
+<header>
+  <h1>真实骑行图片 · MAMMA 双相机对照</h1>
+  <p class="warning">这些图片没有人工 512 点真值。被遮挡部位的精确点位通常无法仅凭 RGB 确认；可见点变多也不自动代表更好。“无法判断”是有效答案。</p>
+  <p class="hint">同一源帧的 cam2、cam4 并排显示完整 ERP；每边只叠加本机位选中人物的点。两边可分别拖动、滚轮缩放。检测编号只在本相机内有效，不表示跨相机同一人。</p>
+</header>
+<main>
+  <section class="toolbar">
+    <label>数据组<select id="dataset"><option value="">全部</option><option>data3</option><option>data4</option></select></label>
+    <label>源帧<select id="frame"><option value="">全部</option></select></label>
+    <label class="check"><input id="unreviewed" type="checkbox">只看未评审</label>
+    <div class="nav"><button id="prev">上一人物</button><button id="next">下一人物</button><button id="resetZoom">回到人物</button></div>
+    <strong id="counter">正在加载…</strong>
+  </section>
+  <p id="identity" class="notice"></p>
+  <div class="controls notice">
+    <label>双机画面显示<select id="pairModel"><option value="class_mean_merged_full_epoch_085">合并数据全量 1 遍 · 阈值 0.85</option><option value="class_mean_merged_full_epoch">合并数据全量 1 遍 · 阈值 0.5</option><option value="original">原模型 · 阈值 0.5</option><option value="finetuned_500">普通 BCE 500 步</option><option value="class_mean_500">类均衡 500 步</option><option value="class_mean_occlusion30_500">类均衡＋30% 遮挡取样</option><option value="class_mean_merged_occlusion30_500">新增遮挡数据＋30% 取样</option><option value="none">仅原图</option></select></label>
+    <button id="pairReset">双机画面复位</button>
+    <label class="check"><input id="overlay" type="checkbox" checked>显示点</label>
+    <label class="check"><input id="maskToggle" type="checkbox">显示选中人物 mask</label>
+    <label class="check"><input id="showVisible" type="checkbox" checked>模型判可见</label>
+    <label class="check"><input id="showOccluded" type="checkbox" checked>模型判遮挡</label>
+    <label class="check"><input id="showOutside" type="checkbox" checked>原图／物理域外</label>
+    <span class="hint">两边同一模板点编号使用同一颜色；实心＝概率达到当前模型阈值，空心＝未达到；原模型阈值 0.5，全量一遍主方案阈值 0.85，灰叉＝原图外或物理域外。悬停一点会在两边同步高亮其编号。黄框只标出所选人物。</span>
+  </div>
+  <div class="paired" id="paired">
+    <section class="panel" id="pair-cam2"><div class="pair-heading"><h2>cam2 · 同帧对照</h2><label>人物<select id="pairPerson-cam2"></select></label></div>
+      <canvas class="pair-canvas" id="pairCanvas-cam2" width="1152" height="576"></canvas><p class="hint pair-info" id="pairInfo-cam2"></p>
+    </section>
+    <section class="panel" id="pair-cam4"><div class="pair-heading"><h2>cam4 · 同帧对照</h2><label>人物<select id="pairPerson-cam4"></select></label></div>
+      <canvas class="pair-canvas" id="pairCanvas-cam4" width="1152" height="576"></canvas><p class="hint pair-info" id="pairInfo-cam4"></p>
+    </section>
+  </div>
+  <p class="hint">两边分别选好要比较的人物；点编号会联动，人物身份需您确认。选择任一人物可在下方细看、评分。滚轮和拖动只改变查看位置，不改变预测坐标。</p>
+  <div class="context"><strong>完整 ERP 上下文</strong><canvas id="context" width="720" height="360"></canvas></div>
+  <label class="notice">人工比较<select id="comparison"><option value="original_vs_full_epoch_085">原模型 0.5 vs 全量一遍 0.85（主要对照）</option><option value="original_vs_full_epoch">原模型 0.5 vs 全量一遍 0.5（原有评审）</option><option value="merged30_vs_full_epoch">合并数据 500 步 vs 全量 1 遍（附加比较）</option><option value="original_vs_merged30">原模型 vs 新增遮挡数据 30%（原有评审）</option><option value="original_vs_finetuned">原模型 vs 普通 BCE 500 步（原有评审）</option><option value="finetuned_vs_balanced">普通 BCE 500 步 vs 类均衡 500 步（独立评审）</option><option value="balanced_vs_occlusion30">类均衡 vs 类均衡＋30% 遮挡取样（独立评审）</option><option value="occlusion30_vs_merged30">旧数据 30% vs 新增遮挡数据 30%（新增数据分析）</option></select></label>
+  <div class="pictures">
+    <div class="panel"><h2>原图局部</h2><canvas class="view" id="base" width="640" height="640"></canvas></div>
+    <div class="panel"><h2 id="headingA">原模型</h2><canvas class="view" id="viewA" width="640" height="640"></canvas></div>
+    <div class="panel"><h2 id="headingB">普通 BCE 500 步</h2><canvas class="view" id="viewB" width="640" height="640"></canvas></div>
+  </div>
+  <p id="pointInfo" class="notice">将鼠标移到点附近可看点编号及两套模型的可见概率。</p>
+  <section class="ratings">
+    <label>点位贴合程度<select id="positionRating"><option value="">尚未评审</option><option value="A">左侧模型更好</option><option value="same">相近</option><option value="B">右侧模型更好</option><option value="unknown">无法判断</option></select></label>
+    <label>可见性 / 遮挡判断<select id="visibilityRating"><option value="">尚未评审</option><option value="A">左侧模型更好</option><option value="same">相近</option><option value="B">右侧模型更好</option><option value="unknown">无法判断</option></select></label>
+    <label class="check"><input id="maskProblem" type="checkbox">输入 mask 有问题</label>
+    <label>备注<textarea id="note" maxlength="500" placeholder="例如：人物被遮挡，点位无法判断；或输入 mask 漏了身体"></textarea></label>
+    <p class="hint">选项改变后立即存到此浏览器草稿。请定期“导出评审 JSON”另存备份。</p>
+  </section>
+  <section class="toolbar">
+    <button id="export">导出评审 JSON</button>
+    <label>导入评审 JSON<input id="import" type="file" accept="application/json,.json"></label>
+  </section>
+  <section class="summary" id="summary">尚待人工评审。</section>
+</main>
+<script>
+"use strict";
+const $ = id => document.getElementById(id);
+const choices = new Set(["", "A", "same", "B", "unknown"]);
+let data, images, targets, current = 0, imageElement, maskElement, mapping = null, maskView = null;
+let review = null, reviews = {}, zoom = 1, centerX = 0, centerY = 0, selectedPoint = null;
+let showVersion = 0;
+const pairState = {cam2: null, cam4: null};
+const pairView = {cam2: {cx: 2880, cy: 1440, zoom: 1}, cam4: {cx: 2880, cy: 1440, zoom: 1}};
+let pairFrameKey = null;
+const canvasIds = ["base", "viewA", "viewB"];
+const viewport = {width: 640, height: 640};
+function modelSide(target, model) {
+  if (model === 'class_mean_merged_full_epoch_085') return 'class_mean_merged_full_epoch';
+  if (model === 'class_mean_500' || model === 'class_mean_occlusion30_500' || model === 'class_mean_merged_occlusion30_500' || model === 'class_mean_merged_full_epoch') return model;
+  return mapping.A_by_target[target.target_id] === model ? 'A' : 'B';
+}
+const modelNames = {original:'原模型 · 阈值 0.5', finetuned_500:'普通 BCE 500 步 · 阈值 0.5', class_mean_500:'类均衡 500 步 · 阈值 0.5', class_mean_occlusion30_500:'类均衡＋30% 遮挡取样 · 阈值 0.5', class_mean_merged_occlusion30_500:'新增遮挡数据＋30% 取样 · 阈值 0.5', class_mean_merged_full_epoch:'合并数据全量 1 遍 · 阈值 0.5', class_mean_merged_full_epoch_085:'合并数据全量 1 遍 · 阈值 0.85'};
+const visibilityThreshold = model => model === 'class_mean_merged_full_epoch_085' ? 0.85 : 0.5;
+function comparisonModels() {
+  if ($('comparison').value === 'original_vs_full_epoch_085')
+    return ['original', 'class_mean_merged_full_epoch_085'];
+  if ($('comparison').value === 'original_vs_full_epoch')
+    return ['original', 'class_mean_merged_full_epoch'];
+  if ($('comparison').value === 'merged30_vs_full_epoch')
+    return ['class_mean_merged_occlusion30_500', 'class_mean_merged_full_epoch'];
+  if ($('comparison').value === 'original_vs_merged30')
+    return ['original', 'class_mean_merged_occlusion30_500'];
+  if ($('comparison').value === 'occlusion30_vs_merged30')
+    return ['class_mean_occlusion30_500', 'class_mean_merged_occlusion30_500'];
+  if ($('comparison').value === 'balanced_vs_occlusion30')
+    return ['class_mean_500', 'class_mean_occlusion30_500'];
+  if ($('comparison').value === 'finetuned_vs_balanced')
+    return ['finetuned_500', 'class_mean_500'];
+  return ['original', 'finetuned_500'];
+}
+function reviewKey() { return `mamma-review-${review.review_set_id}`; }
+function ratedModel(target, answer) {
+  if ($('comparison').value === 'original_vs_full_epoch_085') return answer === 'B' ? 'class_mean_merged_full_epoch_085' : 'original';
+  if ($('comparison').value === 'original_vs_full_epoch') return answer === 'B' ? 'class_mean_merged_full_epoch' : 'original';
+  if ($('comparison').value === 'merged30_vs_full_epoch') return answer === 'B' ? 'class_mean_merged_full_epoch' : 'class_mean_merged_occlusion30_500';
+  if ($('comparison').value === 'original_vs_merged30') return answer === 'B' ? 'class_mean_merged_occlusion30_500' : 'original';
+  if ($('comparison').value === 'occlusion30_vs_merged30') return answer === 'B' ? 'class_mean_merged_occlusion30_500' : 'class_mean_occlusion30_500';
+  if ($('comparison').value === 'balanced_vs_occlusion30') return answer === 'B' ? 'class_mean_occlusion30_500' : 'class_mean_500';
+  if ($('comparison').value === 'finetuned_vs_balanced') return answer === 'B' ? 'class_mean_500' : 'finetuned_500';
+  return mapping.A_by_target[target.target_id] === 'original'
+    ? (answer === 'A' ? 'original' : 'finetuned_500')
+    : (answer === 'A' ? 'finetuned_500' : 'original');
+}
+function showPoint(visible, domain) {
+  if (domain !== 2) return $('showOutside').checked;
+  return visible ? $('showVisible').checked : $('showOccluded').checked;
+}
+
+function matching() {
+  return targets.map((t, i) => i).filter(i => {
+    const t = targets[i], im = images[t.image_id], rating = review.entries[t.target_id];
+    return (!$('dataset').value || im.dataset === $('dataset').value) &&
+      (!$('frame').value || im.source_frame === $('frame').value) &&
+      (!$('unreviewed').checked || !rating.position || !rating.visibility);
+  });
+}
+function refreshFilters() {
+  const frame = $('frame').value;
+  const sourceImages = Object.values(images).filter(im => !$('dataset').value || im.dataset === $('dataset').value);
+  $('frame').innerHTML = '<option value="">全部</option>' + [...new Set(sourceImages.map(im => im.source_frame))].sort().map(x => `<option>${x}</option>`).join('');
+  $('frame').value = frame;
+}
+function move(step) {
+  const list = matching();
+  if (!list.length) {
+    ++showVersion;
+    $('counter').textContent = '当前筛选无人物'; $('identity').textContent = '请调整筛选条件。';
+    imageElement = null; maskElement = null;
+    pairState.cam2 = null; pairState.cam4 = null;
+    for (const camera of ['cam2','cam4']) {
+      $(`pairPerson-${camera}`).replaceChildren();
+      const canvas = $(`pairCanvas-${camera}`);
+      canvas.getContext('2d').clearRect(0,0,canvas.width,canvas.height);
+      $(`pairInfo-${camera}`).textContent = '';
+    }
+    for (const id of canvasIds) $(id).getContext('2d').clearRect(0,0,640,640);
+    $('context').getContext('2d').clearRect(0,0,720,360);
+    return;
+  }
+  let place = list.indexOf(current);
+  if (place < 0) place = 0; else place = (place + step + list.length) % list.length;
+  show(list[place]);
+}
+function loadImage(url) {
+  return new Promise((resolve, reject) => {
+    const img = new Image(); img.onload = () => resolve(img); img.onerror = () => reject(new Error(`图片无法加载: ${url}`)); img.src = url;
+  });
+}
+async function show(index) {
+  const version = ++showVersion;
+  current = index;
+  const t = targets[current], im = images[t.image_id];
+  const padding = t.vertical_padding_top_bottom || [0,0];
+  $('identity').textContent = `${im.dataset} · ${im.source_frame} · ${im.camera} · 检测人物 ${t.raw_index}。两相机编号不代表跨机同一人。${padding[0] || padding[1] ? `上下补黑：上 ${padding[0]} px、下 ${padding[1]} px。` : ''}`;
+  const list = matching(); $('counter').textContent = `${list.indexOf(current)+1} / ${list.length} · 共 ${targets.length} 人物`;
+  const r = review.entries[t.target_id];
+  $('positionRating').value = r.position || ''; $('visibilityRating').value = r.visibility || '';
+  const [leftModel, rightModel] = comparisonModels();
+  $('headingA').textContent = modelNames[leftModel];
+  $('headingB').textContent = modelNames[rightModel];
+  for (const field of ['positionRating', 'visibilityRating']) {
+    $(`${field}`).querySelector('option[value="A"]').textContent = `${modelNames[ratedModel(t, 'A')]}更好`;
+    $(`${field}`).querySelector('option[value="B"]').textContent = `${modelNames[ratedModel(t, 'B')]}更好`;
+  }
+  $('maskProblem').checked = Boolean(r.mask_problem); $('note').value = r.note || '';
+  centerX = (t.box[0] + t.box[2]) / 2; centerY = (t.box[1] + t.box[3]) / 2;
+  zoom = 1; selectedPoint = null;
+  const requested = t.target_id;
+  const [image, mask, pair] = await Promise.all([
+    loadImage(`/image/${t.image_id}`), loadImage(`/mask/${t.target_id}`), loadPair(im, t)
+  ]);
+  if (version !== showVersion || targets[current].target_id !== requested) return;
+  imageElement = image; maskElement = mask;
+  const frameKey = `${im.dataset}/${im.source_frame}`;
+  if (pairFrameKey !== frameKey) {
+    pairFrameKey = frameKey;
+    for (const camera of ['cam2','cam4']) Object.assign(pairView[camera], {cx: 2880, cy: 1440, zoom: 1});
+  }
+  Object.assign(pairState, pair);
+  for (const camera of ['cam2', 'cam4']) {
+    const picker = $(`pairPerson-${camera}`);
+    const candidates = pair[camera].candidates;
+    picker.replaceChildren(...candidates.map(row => {
+      const option = document.createElement('option');
+      option.value = row.target_id; option.textContent = `检测编号 ${row.raw_index}`;
+      return option;
+    }));
+    picker.disabled = !pair[camera].target;
+    if (pair[camera].target) picker.value = pair[camera].target.target_id;
+  }
+  drawPairs(); draw();
+}
+async function loadPair(im, selected) {
+  const parts = await Promise.all(['cam2', 'cam4'].map(async camera => {
+    const imageInfo = Object.values(images).find(row => row.dataset === im.dataset && row.source_frame === im.source_frame && row.camera === camera);
+    const candidates = targets.filter(row => row.image_id === imageInfo?.image_id);
+    const previous = pairState[camera]?.target?.target_id;
+    const target = selected.image_id === imageInfo?.image_id ? selected :
+      candidates.find(row => row.target_id === previous) || candidates[0];
+    const [image, mask] = imageInfo && target ? await Promise.all([
+      loadImage(`/image/${imageInfo.image_id}`), loadImage(`/mask/${target.target_id}`)
+    ]) : [null, null];
+    return [camera, {imageInfo, candidates, target, image, mask}];
+  }));
+  return Object.fromEntries(parts);
+}
+function pairGeometry(camera) {
+  const pair = pairState[camera], view = pairView[camera], canvas = $(`pairCanvas-${camera}`);
+  if (!pair?.image) return null;
+  const scale = canvas.width * view.zoom / pair.image.width;
+  return {canvas, scale, x0: view.cx - canvas.width / (2 * scale), y0: view.cy - canvas.height / (2 * scale)};
+}
+function drawPairMask(ctx, pair, geometry) {
+  if (!$('maskToggle').checked || !pair.mask) return;
+  const {canvas, scale, x0, y0} = geometry;
+  const overlay = document.createElement('canvas');
+  overlay.width = canvas.width; overlay.height = canvas.height;
+  const mctx = overlay.getContext('2d');
+  mctx.save(); mctx.translate(-x0 * scale, -y0 * scale); mctx.scale(scale, scale);
+  for (const offset of [-pair.mask.width, 0, pair.mask.width]) mctx.drawImage(pair.mask, offset, 0);
+  mctx.restore();
+  const pixels = mctx.getImageData(0, 0, canvas.width, canvas.height);
+  for (let i = 0; i < pixels.data.length; i += 4) {
+    const alpha = pixels.data[i];
+    pixels.data[i] = 0; pixels.data[i+1] = 199; pixels.data[i+2] = 220;
+    pixels.data[i+3] = Math.round(alpha * .35);
+  }
+  mctx.putImageData(pixels, 0, 0); ctx.drawImage(overlay, 0, 0);
+}
+function drawPair(camera) {
+  const pair = pairState[camera], geometry = pairGeometry(camera);
+  const canvas = $(`pairCanvas-${camera}`), ctx = canvas.getContext('2d');
+  ctx.fillStyle = '#000'; ctx.fillRect(0, 0, canvas.width, canvas.height);
+  $(`pair-${camera}`).classList.toggle('pair-selected', pair?.target?.target_id === targets[current]?.target_id);
+  if (!geometry) return;
+  const {scale, x0, y0} = geometry, image = pair.image;
+  ctx.save(); ctx.beginPath(); ctx.rect(0, 0, canvas.width, canvas.height); ctx.clip();
+  ctx.translate(-x0 * scale, -y0 * scale); ctx.scale(scale, scale);
+  for (const offset of [-image.width, 0, image.width]) ctx.drawImage(image, offset, 0);
+  ctx.restore();
+  drawPairMask(ctx, pair, geometry);
+  const model = $('pairModel').value;
+  const target = pair.target;
+  if (model !== 'none' && $('overlay').checked && target) {
+    const row = target[modelSide(target, model)];
+    for (let i = 0; i < 512; i++) {
+      const visible = row.visibility_probability[i] >= visibilityThreshold(model);
+      const domain = row.point_domain ? row.point_domain[i] : 2;
+      if (!showPoint(visible, domain) && selectedPoint !== i) continue;
+      let x = row.xy[i][0];
+      x += Math.ceil((x0 - x) / image.width) * image.width;
+      const px = (x - x0) * scale, py = (row.xy[i][1] - y0) * scale;
+      if (px < -8 || px > canvas.width + 8 || py < -8 || py > canvas.height + 8) continue;
+      const linked = selectedPoint === i;
+      if (domain !== 2) {
+        ctx.strokeStyle = linked ? '#fff' : '#bbb'; ctx.lineWidth = linked ? 3 : 1.5;
+        ctx.beginPath(); ctx.moveTo(px-4,py-4); ctx.lineTo(px+4,py+4);
+        ctx.moveTo(px+4,py-4); ctx.lineTo(px-4,py+4); ctx.stroke();
+      } else {
+        ctx.beginPath(); ctx.arc(px, py, linked ? 5.5 : 2.8, 0, 2*Math.PI);
+        ctx.fillStyle = `hsl(${(i * 137.5) % 360} 95% 55%)`;
+        ctx.strokeStyle = '#111'; ctx.lineWidth = 1.4;
+        if (visible) ctx.fill(); else { ctx.lineWidth = 2; ctx.stroke(); }
+        if (linked) {ctx.strokeStyle = '#fff'; ctx.lineWidth = 2; ctx.stroke();}
+      }
+    }
+  }
+  if (model !== 'none' && target) {
+    const box = target.box, py = (box[1] - y0) * scale;
+    const width = Math.max(2, (box[2] - box[0]) * scale), height = (box[3] - box[1]) * scale;
+    ctx.strokeStyle = '#ffcf33'; ctx.lineWidth = 2;
+    for (const offset of [-image.width, 0, image.width]) {
+      const px = (box[0] + offset - x0) * scale;
+      if (px > canvas.width || px + width < 0 || py > canvas.height || py + height < 0) continue;
+      ctx.strokeRect(px, py, width, height);
+      ctx.fillStyle = ctx.strokeStyle; ctx.font = 'bold 16px system-ui';
+      ctx.fillText(`人 ${target.raw_index}`, Math.max(2, px), Math.max(17, py - 3));
+    }
+  }
+  let info = `当前仅显示检测人物 ${target?.raw_index ?? '无'} 的 512 点 · ${model === 'none' ? '原图' : modelNames[model]}。`;
+  if (selectedPoint !== null && model !== 'none' && target) {
+    const row = target[modelSide(target, model)], domain = row.point_domain?.[selectedPoint] ?? 2;
+    info += ` 对应点 ${selectedPoint}：可见概率 ${row.visibility_probability[selectedPoint].toFixed(3)}，${['原图外','物理域外','物理域内'][domain]}。`;
+  }
+  $(`pairInfo-${camera}`).textContent = info;
+}
+function drawPairs() {
+  for (const camera of ['cam2', 'cam4']) drawPair(camera);
+}
+function halfRange() {
+  const t = targets[current], width = t.box[2] - t.box[0], height = t.box[3] - t.box[1];
+  return Math.max(220, width * 1.8, height * 1.45) / zoom;
+}
+function drawImagePeriodic(ctx, img) {
+  const range = halfRange(), scale = viewport.width / (2 * range);
+  const x0 = centerX - range, y0 = centerY - range;
+  ctx.save(); ctx.beginPath(); ctx.rect(0, 0, 640, 640); ctx.clip();
+  ctx.translate(-x0 * scale, -y0 * scale); ctx.scale(scale, scale);
+  for (const offset of [-img.width, 0, img.width]) ctx.drawImage(img, offset, 0);
+  ctx.restore();
+}
+function drawPeriodic(ctx, img, model) {
+  const range = halfRange(), scale = viewport.width / (2 * range);
+  const x0 = centerX - range, y0 = centerY - range;
+  drawImagePeriodic(ctx, img);
+  if (maskView) ctx.drawImage(maskView, 0, 0);
+  if (!model || !$('overlay').checked) return;
+  const row = targets[current][modelSide(targets[current], model)];
+  for (let i = 0; i < 512; i++) {
+    const visible = row.visibility_probability[i] >= visibilityThreshold(model);
+    const domain = row.point_domain ? row.point_domain[i] : 2;
+    if (!showPoint(visible, domain) && selectedPoint !== i) continue;
+    let x = row.xy[i][0]; x += Math.round((centerX - x) / img.width) * img.width;
+    const px = (x - x0) * scale, py = (row.xy[i][1] - y0) * scale;
+    if (px < -8 || px > 648 || py < -8 || py > 648) continue;
+    if (domain !== 2) {
+      ctx.strokeStyle = '#bbb'; ctx.lineWidth = selectedPoint === i ? 2.8 : 1.5;
+      ctx.beginPath();ctx.moveTo(px-4,py-4);ctx.lineTo(px+4,py+4);
+      ctx.moveTo(px+4,py-4);ctx.lineTo(px-4,py+4);ctx.stroke();
+      continue;
+    }
+    ctx.beginPath(); ctx.arc(px, py, selectedPoint === i ? 5.5 : 2.8, 0, 2*Math.PI);
+    ctx.fillStyle = `hsl(${(i * 137.5) % 360} 95% 55%)`;
+    ctx.strokeStyle = '#111'; ctx.lineWidth = 1.4;
+    if (visible) ctx.fill(); else { ctx.lineWidth = 2; ctx.stroke(); }
+    if (selectedPoint === i) {ctx.strokeStyle = '#fff'; ctx.stroke();}
+  }
+}
+function draw() {
+  if (!imageElement) return;
+  maskView = null;
+  if ($('maskToggle').checked && maskElement) {
+    maskView = document.createElement('canvas'); maskView.width = 640; maskView.height = 640;
+    const mctx = maskView.getContext('2d'); drawImagePeriodic(mctx, maskElement);
+    const pixels = mctx.getImageData(0,0,640,640);
+    for (let i=0; i<pixels.data.length; i+=4) {
+      const alpha = pixels.data[i]; pixels.data[i]=0; pixels.data[i+1]=199;
+      pixels.data[i+2]=220; pixels.data[i+3]=Math.round(alpha*.35);
+    }
+    mctx.putImageData(pixels,0,0);
+  }
+  canvasIds.forEach((id, i) => {
+    const canvas = $(id), ctx = canvas.getContext('2d');
+    ctx.fillStyle = '#000'; ctx.fillRect(0,0,640,640);
+    drawPeriodic(ctx, imageElement, i === 0 ? null : comparisonModels()[i - 1]);
+  });
+  const ctx = $('context').getContext('2d'); ctx.clearRect(0,0,720,360);
+  ctx.drawImage(imageElement, 0, 0, 720, 360);
+  const box = targets[current].box;
+  ctx.strokeStyle='#ffcf33'; ctx.lineWidth=2;
+  const width = Math.max(2, (box[2]-box[0])/8), x = box[0]/8, y = box[1]/8, h = (box[3]-box[1])/8;
+  ctx.strokeRect(x,y,width,h);
+  if (x + width > 720) ctx.strokeRect(x-720,y,width,h);
+}
+function save() {
+  const t = targets[current];
+  review.entries[t.target_id] = {position: $('positionRating').value, visibility: $('visibilityRating').value,
+    mask_problem: $('maskProblem').checked, note: $('note').value.slice(0,500),
+    judged_after_reveal: true};
+  localStorage.setItem(reviewKey(), JSON.stringify(review));
+  summary();
+}
+function counts(field) {
+  const out = {improved:0, similar:0, worse:0, unknown:0, unreviewed:0};
+  for (const t of targets) {
+    const value = review.entries[t.target_id][field];
+    if (!value) out.unreviewed++;
+    else if (value === 'unknown') out.unknown++;
+    else if (value === 'same') out.similar++;
+    else {
+      out[ratedModel(t, value) === comparisonModels()[1] ? 'improved' : 'worse']++;
+    }
+  }
+  return out;
+}
+function summary() {
+  const answered = targets.filter(t => review.entries[t.target_id].position && review.entries[t.target_id].visibility).length;
+  const partial = targets.filter(t => Boolean(review.entries[t.target_id].position) !== Boolean(review.entries[t.target_id].visibility)).length;
+  const problems = targets.filter(t => review.entries[t.target_id].mask_problem).length;
+  const base = `两项均已评审 ${answered}/${targets.length} 人物；部分评审 ${partial}；输入 mask 问题 ${problems}。`;
+  const p = counts('position'), v = counts('visibility');
+  const [left, right] = comparisonModels();
+  $('summary').textContent = `${base} 点位：${modelNames[right]}更好 ${p.improved}、相近 ${p.similar}、${modelNames[left]}更好 ${p.worse}、无法判断 ${p.unknown}、未评审 ${p.unreviewed}。可见性：${modelNames[right]}更好 ${v.improved}、相近 ${v.similar}、${modelNames[left]}更好 ${v.worse}、无法判断 ${v.unknown}、未评审 ${v.unreviewed}。以上只统计人工填写的条目。`;
+}
+function exportReview() {
+  const blob = new Blob([JSON.stringify(review, null, 2)], {type:'application/json'});
+  const url = URL.createObjectURL(blob), a = document.createElement('a');
+  a.href=url; a.download=`${review.review_set_id}_review.json`; a.click();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
+async function importReview(file) {
+  const incoming = JSON.parse(await file.text());
+  const ids = targets.map(t => t.target_id);
+  if (incoming.schema !== 'real_riding_human_review_v1' || incoming.review_set_id !== review.review_set_id ||
+      incoming.assignment_seed !== review.assignment_seed || JSON.stringify(incoming.model_identity) !== JSON.stringify(review.model_identity) ||
+      JSON.stringify(incoming.comparison) !== JSON.stringify(review.comparison) ||
+      JSON.stringify(incoming.target_ids) !== JSON.stringify(ids) ||
+      Object.keys(incoming.entries || {}).sort().join('|') !== ids.slice().sort().join('|')) throw Error('评审集、人物或模型映射身份不匹配');
+  for (const entry of Object.values(incoming.entries)) {
+    if (!choices.has(entry.position) || !choices.has(entry.visibility) || typeof entry.mask_problem !== 'boolean' ||
+        typeof entry.note !== 'string' || entry.note.length > 500 || typeof entry.judged_after_reveal !== 'boolean') throw Error('评审 JSON 字段不合法');
+  }
+  if (typeof incoming.revealed !== 'boolean') throw Error('评审状态不合法');
+  if (!incoming.revealed && Object.values(incoming.entries).some(entry => entry.judged_after_reveal)) throw Error('揭晓状态与评审记录冲突');
+  review = incoming;
+  reviews[$('comparison').value] = review;
+  review.revealed = true;
+  localStorage.setItem(reviewKey(), JSON.stringify(review));
+  await show(current); summary();
+}
+function installCanvas(canvas) {
+  let drag = null;
+  canvas.addEventListener('pointerdown', event => {drag={x:event.clientX,y:event.clientY,cx:centerX,cy:centerY};canvas.setPointerCapture(event.pointerId);});
+  canvas.addEventListener('pointermove', event => {
+    if (drag) {
+      const pixels = canvas.getBoundingClientRect().width;
+      centerX = drag.cx - (event.clientX - drag.x) * 2 * halfRange() / pixels;
+      centerY = drag.cy - (event.clientY - drag.y) * 2 * halfRange() / pixels;
+      draw(); return;
+    }
+    if (!targets || !imageElement) return;
+    const models = comparisonModels();
+    const side = canvas.id === 'viewA' ? modelSide(targets[current], models[0]) : canvas.id === 'viewB' ? modelSide(targets[current], models[1]) : null;
+    if (!side) return;
+    const rect = canvas.getBoundingClientRect(), px = (event.clientX - rect.left) * 640 / rect.width, py = (event.clientY - rect.top) * 640 / rect.height;
+    const range = halfRange(), scale = 640/(2*range), t = targets[current]; let best=-1, dist=90;
+    for (let i=0; i<512; i++) {
+      const domain = t[side].point_domain?.[i] ?? 2;
+      const model = canvas.id === 'viewA' ? models[0] : models[1];
+      if (!showPoint(t[side].visibility_probability[i] >= visibilityThreshold(model), domain)) continue;
+      const p=t[side].xy[i]; let x=p[0]; x += Math.round((centerX-x)/imageElement.width)*imageElement.width;
+      const d=(x-centerX)*scale+320-px, e=(p[1]-centerY)*scale+320-py, n=d*d+e*e;
+      if (n<dist) {dist=n;best=i;}
+    }
+    const nextPoint = best < 0 ? null : best;
+    if (nextPoint !== selectedPoint) {
+      selectedPoint = nextPoint;
+      const label = side => ['原图外','物理域外','物理域内'][t[side].point_domain?.[best] ?? 2];
+      const left = modelSide(t, models[0]), right = modelSide(t, models[1]);
+      $('pointInfo').textContent=best<0 ? '将鼠标移到点附近可看点编号及两套模型的可见概率。' : `点 ${best} · ${modelNames[models[0]]}可见概率 ${t[left].visibility_probability[best].toFixed(3)}（${label(left)}） · ${modelNames[models[1]]}可见概率 ${t[right].visibility_probability[best].toFixed(3)}（${label(right)}）`;
+      drawPairs(); draw();
+    }
+  });
+  for (const name of ['pointerup','pointercancel']) canvas.addEventListener(name, () => drag=null);
+  canvas.addEventListener('wheel', event => {event.preventDefault();zoom=Math.max(.5,Math.min(12,zoom*(event.deltaY<0?1.15:1/1.15)));draw();},{passive:false});
+}
+function clampPairView(camera) {
+  const image = pairState[camera]?.image;
+  if (!image) return;
+  const view = pairView[camera], halfHeight = image.height / (2 * view.zoom);
+  view.cx = ((view.cx % image.width) + image.width) % image.width;
+  view.cy = Math.min(image.height - halfHeight, Math.max(halfHeight, view.cy));
+}
+function pairPointAt(camera, px, py) {
+  const pair = pairState[camera], geometry = pairGeometry(camera);
+  if (!geometry || !pair.target || !$('overlay').checked || $('pairModel').value === 'none') return null;
+  const {scale, x0, y0} = geometry;
+  let best = null, distance = 100;
+  const row = pair.target[modelSide(pair.target, $('pairModel').value)];
+  for (let i = 0; i < 512; i++) {
+    const visible = row.visibility_probability[i] >= visibilityThreshold($('pairModel').value);
+    const domain = row.point_domain ? row.point_domain[i] : 2;
+    if (!showPoint(visible, domain)) continue;
+    let x = row.xy[i][0];
+    x += Math.ceil((x0 - x) / pair.image.width) * pair.image.width;
+    const dx = (x - x0) * scale - px, dy = (row.xy[i][1] - y0) * scale - py;
+    const d = dx*dx + dy*dy;
+    if (d < distance) {distance = d; best = {index: i};}
+  }
+  return best;
+}
+function installPairCanvas(camera) {
+  const canvas = $(`pairCanvas-${camera}`), view = pairView[camera];
+  let drag = null;
+  canvas.addEventListener('pointerdown', event => {
+    drag = {x: event.clientX, y: event.clientY, cx: view.cx, cy: view.cy};
+    canvas.setPointerCapture(event.pointerId);
+  });
+  canvas.addEventListener('pointermove', event => {
+    const pair = pairState[camera];
+    if (!pair?.image) return;
+    const rect = canvas.getBoundingClientRect();
+    if (drag) {
+      view.cx = drag.cx - (event.clientX - drag.x) * pair.image.width / (rect.width * view.zoom);
+      view.cy = drag.cy - (event.clientY - drag.y) * pair.image.height / (rect.height * view.zoom);
+      clampPairView(camera); drawPair(camera); return;
+    }
+    const point = pairPointAt(camera, (event.clientX - rect.left) * canvas.width / rect.width,
+      (event.clientY - rect.top) * canvas.height / rect.height);
+    if (point && selectedPoint !== point.index) {
+      selectedPoint = point.index;
+      drawPairs(); draw();
+    }
+  });
+  for (const name of ['pointerup','pointercancel']) canvas.addEventListener(name, () => drag = null);
+  canvas.addEventListener('pointerleave', () => {
+    if (!drag) drawPair(camera);
+  });
+  canvas.addEventListener('wheel', event => {
+    event.preventDefault();
+    const pair = pairState[camera];
+    if (!pair?.image) return;
+    const rect = canvas.getBoundingClientRect();
+    const rx = (event.clientX - rect.left) / rect.width - .5;
+    const ry = (event.clientY - rect.top) / rect.height - .5;
+    const worldX = view.cx + rx * pair.image.width / view.zoom;
+    const worldY = view.cy + ry * pair.image.height / view.zoom;
+    view.zoom = Math.max(1, Math.min(16, view.zoom * (event.deltaY < 0 ? 1.2 : 1/1.2)));
+    view.cx = worldX - rx * pair.image.width / view.zoom;
+    view.cy = worldY - ry * pair.image.height / view.zoom;
+    clampPairView(camera); drawPair(camera);
+  }, {passive:false});
+}
+async function init() {
+  data = await (await fetch('/data')).json();
+  mapping = await (await fetch('/reveal')).json();
+  const balanced = await (await fetch('/balanced')).json();
+  const occlusion30 = await (await fetch('/occlusion30')).json();
+  const merged30 = await (await fetch('/merged30')).json();
+  const fullEpoch = await (await fetch('/full-epoch')).json();
+  if (mapping.review_set_id !== data.review_set_id) throw Error('模型映射与评审集不匹配');
+  images = Object.fromEntries(data.images.map(im => [im.image_id, im])); targets = data.targets;
+  const ids=targets.map(t=>t.target_id);
+  if (balanced.schema !== 'real_riding_class_mean_predictions_v1' ||
+      balanced.review_set_id !== data.review_set_id || JSON.stringify(balanced.target_ids) !== JSON.stringify(ids))
+    throw Error('类均衡预测与固定评审集不匹配');
+  for (const target of targets) target.class_mean_500 = balanced.targets[target.target_id];
+  if (occlusion30.schema !== 'real_riding_additional_predictions_v1' ||
+      occlusion30.model !== 'class_mean_occlusion30_500' ||
+      occlusion30.review_set_id !== data.review_set_id ||
+      JSON.stringify(occlusion30.target_ids) !== JSON.stringify(ids))
+    throw Error('30% 遮挡取样预测与固定评审集不匹配');
+  for (const target of targets) target.class_mean_occlusion30_500 = occlusion30.targets[target.target_id];
+  if (merged30.schema !== 'real_riding_additional_predictions_v1' ||
+      merged30.model !== 'class_mean_merged_occlusion30_500' ||
+      merged30.review_set_id !== data.review_set_id ||
+      JSON.stringify(merged30.target_ids) !== JSON.stringify(ids))
+    throw Error('新增遮挡数据预测与固定评审集不匹配');
+  for (const target of targets) target.class_mean_merged_occlusion30_500 = merged30.targets[target.target_id];
+  if (fullEpoch.schema !== 'real_riding_additional_predictions_v1' ||
+      fullEpoch.model !== 'class_mean_merged_full_epoch' ||
+      fullEpoch.review_set_id !== data.review_set_id ||
+      JSON.stringify(fullEpoch.target_ids) !== JSON.stringify(ids))
+    throw Error('全量一遍预测与固定评审集不匹配');
+  for (const target of targets) target.class_mean_merged_full_epoch = fullEpoch.targets[target.target_id];
+  const originalReview = {schema:'real_riding_human_review_v1',review_set_id:data.review_set_id,assignment_seed:data.assignment_seed,
+            model_identity:data.model_identity,
+            target_ids:ids,revealed:false,entries:Object.fromEntries(ids.map(id=>[id,{position:'',visibility:'',mask_problem:false,note:'',judged_after_reveal:false}]))};
+  const balancedReview = {schema:'real_riding_human_review_v1',
+    review_set_id:`${data.review_set_id}_ordinary_vs_class_mean_500`,assignment_seed:data.assignment_seed,
+    model_identity:{finetuned_500:data.model_identity.finetuned_500,
+      class_mean_500:{path:balanced.checkpoint,size_bytes:balanced.checkpoint_size_bytes,mtime_ns:balanced.checkpoint_mtime_ns}},
+    target_ids:ids,revealed:true,comparison:['finetuned_500','class_mean_500'],
+    entries:Object.fromEntries(ids.map(id=>[id,{position:'',visibility:'',mask_problem:false,note:'',judged_after_reveal:true}]))};
+  const occlusionReview = {schema:'real_riding_human_review_v1',
+    review_set_id:`${data.review_set_id}_class_mean_vs_occlusion30_500`,assignment_seed:data.assignment_seed,
+    model_identity:{class_mean_500:balancedReview.model_identity.class_mean_500,
+      class_mean_occlusion30_500:{path:occlusion30.checkpoint,size_bytes:occlusion30.checkpoint_size_bytes,mtime_ns:occlusion30.checkpoint_mtime_ns}},
+    target_ids:ids,revealed:true,comparison:['class_mean_500','class_mean_occlusion30_500'],
+    entries:Object.fromEntries(ids.map(id=>[id,{position:'',visibility:'',mask_problem:false,note:'',judged_after_reveal:true}]))};
+  const mergedReview = {schema:'real_riding_human_review_v1',
+    review_set_id:`${data.review_set_id}_occlusion30_vs_merged30_500`,assignment_seed:data.assignment_seed,
+    model_identity:{class_mean_occlusion30_500:occlusionReview.model_identity.class_mean_occlusion30_500,
+      class_mean_merged_occlusion30_500:{path:merged30.checkpoint,size_bytes:merged30.checkpoint_size_bytes,mtime_ns:merged30.checkpoint_mtime_ns}},
+    target_ids:ids,revealed:true,comparison:['class_mean_occlusion30_500','class_mean_merged_occlusion30_500'],
+    entries:Object.fromEntries(ids.map(id=>[id,{position:'',visibility:'',mask_problem:false,note:'',judged_after_reveal:true}]))};
+  const originalMergedReview = {schema:'real_riding_human_review_v1',
+    review_set_id:`${data.review_set_id}_original_vs_merged30_500`,assignment_seed:data.assignment_seed,
+    model_identity:{original:data.model_identity.original,
+      class_mean_merged_occlusion30_500:mergedReview.model_identity.class_mean_merged_occlusion30_500},
+    target_ids:ids,revealed:true,comparison:['original','class_mean_merged_occlusion30_500'],
+    entries:Object.fromEntries(ids.map(id=>[id,{position:'',visibility:'',mask_problem:false,note:'',judged_after_reveal:true}]))};
+  const fullEpochIdentity = {path:fullEpoch.checkpoint,size_bytes:fullEpoch.checkpoint_size_bytes,mtime_ns:fullEpoch.checkpoint_mtime_ns};
+  const originalFull085Review = {schema:'real_riding_human_review_v1',
+    review_set_id:`${data.review_set_id}_original05_vs_full_epoch085`,assignment_seed:data.assignment_seed,
+    model_identity:{original:{...data.model_identity.original,visibility_threshold:0.5},
+      class_mean_merged_full_epoch_085:{...fullEpochIdentity,visibility_threshold:0.85}},
+    target_ids:ids,revealed:true,comparison:['original','class_mean_merged_full_epoch_085'],
+    entries:Object.fromEntries(ids.map(id=>[id,{position:'',visibility:'',mask_problem:false,note:'',judged_after_reveal:true}]))};
+  const originalFullReview = {schema:'real_riding_human_review_v1',
+    review_set_id:`${data.review_set_id}_original_vs_full_epoch`,assignment_seed:data.assignment_seed,
+    model_identity:{original:data.model_identity.original,
+      class_mean_merged_full_epoch:fullEpochIdentity},
+    target_ids:ids,revealed:true,comparison:['original','class_mean_merged_full_epoch'],
+    entries:Object.fromEntries(ids.map(id=>[id,{position:'',visibility:'',mask_problem:false,note:'',judged_after_reveal:true}]))};
+  const mergedFullReview = {schema:'real_riding_human_review_v1',
+    review_set_id:`${data.review_set_id}_merged30_vs_full_epoch`,assignment_seed:data.assignment_seed,
+    model_identity:{class_mean_merged_occlusion30_500:mergedReview.model_identity.class_mean_merged_occlusion30_500,
+      class_mean_merged_full_epoch:fullEpochIdentity},
+    target_ids:ids,revealed:true,comparison:['class_mean_merged_occlusion30_500','class_mean_merged_full_epoch'],
+    entries:Object.fromEntries(ids.map(id=>[id,{position:'',visibility:'',mask_problem:false,note:'',judged_after_reveal:true}]))};
+  for (const [name, initial] of [['original_vs_finetuned',originalReview],['finetuned_vs_balanced',balancedReview],['balanced_vs_occlusion30',occlusionReview],['occlusion30_vs_merged30',mergedReview],['original_vs_merged30',originalMergedReview],['original_vs_full_epoch',originalFullReview],['original_vs_full_epoch_085',originalFull085Review],['merged30_vs_full_epoch',mergedFullReview]]) {
+    const draft=localStorage.getItem(`mamma-review-${initial.review_set_id}`);
+    reviews[name]=initial;
+    if (draft) {
+      try {const saved=JSON.parse(draft);if(saved.review_set_id===initial.review_set_id &&
+        JSON.stringify(saved.model_identity)===JSON.stringify(initial.model_identity) &&
+        JSON.stringify(saved.target_ids)===JSON.stringify(ids)) reviews[name]=saved;} catch (_) {}
+    }
+  }
+  review = reviews.original_vs_full_epoch_085;
+  review.revealed = true;
+  localStorage.setItem(reviewKey(), JSON.stringify(review));
+  refreshFilters();
+  for (const id of ['dataset','frame','unreviewed']) $(id).addEventListener('change',()=>{if(id==='dataset')refreshFilters();move(0);});
+  for (const id of ['overlay','maskToggle','showVisible','showOccluded','showOutside']) $(id).addEventListener('change',()=>{
+    selectedPoint = null;
+    $('pointInfo').textContent = '将鼠标移到点附近可看点编号及两套模型的可见概率。';
+    drawPairs(); draw();
+  });
+  $('pairModel').addEventListener('change',drawPairs);
+  $('comparison').addEventListener('change',()=>{
+    review = reviews[$('comparison').value];
+    $('unreviewed').checked = false;
+    show(current); summary();
+  });
+  $('pairReset').onclick=()=>{
+    for (const camera of ['cam2','cam4']) Object.assign(pairView[camera], {cx:2880, cy:1440, zoom:1});
+    drawPairs();
+  };
+  for (const id of ['positionRating','visibilityRating','maskProblem','note']) $(id).addEventListener(id==='note'?'input':'change',save);
+  $('prev').onclick=()=>move(-1);$('next').onclick=()=>move(1);$('resetZoom').onclick=()=>show(current);
+  $('export').onclick=exportReview;
+  $('import').onchange=async event=>{try{if(event.target.files[0])await importReview(event.target.files[0]);}catch(error){alert(error.message);}event.target.value='';};
+  for (const camera of ['cam2','cam4']) $(`pairPerson-${camera}`).addEventListener('change', event => {
+    const index = targets.findIndex(t => t.target_id === event.target.value);
+    if (index >= 0) show(index);
+  });
+  canvasIds.forEach(id=>installCanvas($(id)));
+  for (const camera of ['cam2','cam4']) installPairCanvas(camera);
+  await show(0);summary();
+}
+init().catch(error => { $('counter').textContent=`页面加载失败：${error.message}`; console.error(error); });
+</script>
+</body>
+</html>
