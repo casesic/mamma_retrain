@@ -59,7 +59,7 @@ def run(device, *, config_path=CONFIG, output=OUTPUT, checkpoint=CHECKPOINT,
     if model_name == "class_mean_500":
         load_frozen_20261024_class_mean_state(checkpoint, model, config, manifests)
     elif model_name in ("class_mean_occlusion30_500", "class_mean_merged_occlusion30_500",
-                        "class_mean_merged_full_epoch"):
+                        "class_mean_merged_full_epoch", "self_occlusion_full_epoch"):
         load_evaluation_boundary(checkpoint, model, config, manifests)
     else:
         raise ValueError("unsupported_fixed_real_comparison_model")

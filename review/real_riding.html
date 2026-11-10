@@ -57,7 +57,7 @@ textarea { width: min(720px, 95%); min-height: 50px; }
   </section>
   <p id="identity" class="notice"></p>
   <div class="controls notice">
-    <label>双机画面显示<select id="pairModel"><option value="class_mean_merged_full_epoch_085">合并数据全量 1 遍 · 阈值 0.85</option><option value="class_mean_merged_full_epoch">合并数据全量 1 遍 · 阈值 0.5</option><option value="original">原模型 · 阈值 0.5</option><option value="finetuned_500">普通 BCE 500 步</option><option value="class_mean_500">类均衡 500 步</option><option value="class_mean_occlusion30_500">类均衡＋30% 遮挡取样</option><option value="class_mean_merged_occlusion30_500">新增遮挡数据＋30% 取样</option><option value="none">仅原图</option></select></label>
+    <label>双机画面显示<select id="pairModel"><option value="class_mean_merged_full_epoch_085">合并数据全量 1 遍 · 阈值 0.85</option><option value="class_mean_merged_full_epoch">合并数据全量 1 遍 · 阈值 0.5</option><option value="self_occlusion_full_epoch">自遮挡负例试验 · 全量 1 遍 · 阈值 0.5</option><option value="original">原模型 · 阈值 0.5</option><option value="finetuned_500">普通 BCE 500 步</option><option value="class_mean_500">类均衡 500 步</option><option value="class_mean_occlusion30_500">类均衡＋30% 遮挡取样</option><option value="class_mean_merged_occlusion30_500">新增遮挡数据＋30% 取样</option><option value="none">仅原图</option></select></label>
     <button id="pairReset">双机画面复位</button>
     <label class="check"><input id="overlay" type="checkbox" checked>显示点</label>
     <label class="check"><input id="maskToggle" type="checkbox">显示选中人物 mask</label>
@@ -76,7 +76,7 @@ textarea { width: min(720px, 95%); min-height: 50px; }
   </div>
   <p class="hint">两边分别选好要比较的人物；点编号会联动，人物身份需您确认。选择任一人物可在下方细看、评分。滚轮和拖动只改变查看位置，不改变预测坐标。</p>
   <div class="context"><strong>完整 ERP 上下文</strong><canvas id="context" width="720" height="360"></canvas></div>
-  <label class="notice">人工比较<select id="comparison"><option value="original_vs_full_epoch_085">原模型 0.5 vs 全量一遍 0.85（主要对照）</option><option value="original_vs_full_epoch">原模型 0.5 vs 全量一遍 0.5（原有评审）</option><option value="merged30_vs_full_epoch">合并数据 500 步 vs 全量 1 遍（附加比较）</option><option value="original_vs_merged30">原模型 vs 新增遮挡数据 30%（原有评审）</option><option value="original_vs_finetuned">原模型 vs 普通 BCE 500 步（原有评审）</option><option value="finetuned_vs_balanced">普通 BCE 500 步 vs 类均衡 500 步（独立评审）</option><option value="balanced_vs_occlusion30">类均衡 vs 类均衡＋30% 遮挡取样（独立评审）</option><option value="occlusion30_vs_merged30">旧数据 30% vs 新增遮挡数据 30%（新增数据分析）</option></select></label>
+  <label class="notice">人工比较<select id="comparison"><option value="original_vs_full_epoch_085">原模型 0.5 vs 全量一遍 0.85（主要对照）</option><option value="full_epoch_vs_self_occlusion">原标签全量一遍 0.5 vs 自遮挡试验全量一遍 0.5</option><option value="original_vs_full_epoch">原模型 0.5 vs 全量一遍 0.5（原有评审）</option><option value="merged30_vs_full_epoch">合并数据 500 步 vs 全量 1 遍（附加比较）</option><option value="original_vs_merged30">原模型 vs 新增遮挡数据 30%（原有评审）</option><option value="original_vs_finetuned">原模型 vs 普通 BCE 500 步（原有评审）</option><option value="finetuned_vs_balanced">普通 BCE 500 步 vs 类均衡 500 步（独立评审）</option><option value="balanced_vs_occlusion30">类均衡 vs 类均衡＋30% 遮挡取样（独立评审）</option><option value="occlusion30_vs_merged30">旧数据 30% vs 新增遮挡数据 30%（新增数据分析）</option></select></label>
   <div class="pictures">
     <div class="panel"><h2>原图局部</h2><canvas class="view" id="base" width="640" height="640"></canvas></div>
     <div class="panel"><h2 id="headingA">原模型</h2><canvas class="view" id="viewA" width="640" height="640"></canvas></div>
@@ -110,16 +110,18 @@ const canvasIds = ["base", "viewA", "viewB"];
 const viewport = {width: 640, height: 640};
 function modelSide(target, model) {
   if (model === 'class_mean_merged_full_epoch_085') return 'class_mean_merged_full_epoch';
-  if (model === 'class_mean_500' || model === 'class_mean_occlusion30_500' || model === 'class_mean_merged_occlusion30_500' || model === 'class_mean_merged_full_epoch') return model;
+  if (model === 'class_mean_500' || model === 'class_mean_occlusion30_500' || model === 'class_mean_merged_occlusion30_500' || model === 'class_mean_merged_full_epoch' || model === 'self_occlusion_full_epoch') return model;
   return mapping.A_by_target[target.target_id] === model ? 'A' : 'B';
 }
-const modelNames = {original:'原模型 · 阈值 0.5', finetuned_500:'普通 BCE 500 步 · 阈值 0.5', class_mean_500:'类均衡 500 步 · 阈值 0.5', class_mean_occlusion30_500:'类均衡＋30% 遮挡取样 · 阈值 0.5', class_mean_merged_occlusion30_500:'新增遮挡数据＋30% 取样 · 阈值 0.5', class_mean_merged_full_epoch:'合并数据全量 1 遍 · 阈值 0.5', class_mean_merged_full_epoch_085:'合并数据全量 1 遍 · 阈值 0.85'};
+const modelNames = {original:'原模型 · 阈值 0.5', finetuned_500:'普通 BCE 500 步 · 阈值 0.5', class_mean_500:'类均衡 500 步 · 阈值 0.5', class_mean_occlusion30_500:'类均衡＋30% 遮挡取样 · 阈值 0.5', class_mean_merged_occlusion30_500:'新增遮挡数据＋30% 取样 · 阈值 0.5', class_mean_merged_full_epoch:'合并数据全量 1 遍 · 阈值 0.5', class_mean_merged_full_epoch_085:'合并数据全量 1 遍 · 阈值 0.85', self_occlusion_full_epoch:'自遮挡负例试验 · 全量 1 遍 · 阈值 0.5'};
 const visibilityThreshold = model => model === 'class_mean_merged_full_epoch_085' ? 0.85 : 0.5;
 function comparisonModels() {
   if ($('comparison').value === 'original_vs_full_epoch_085')
     return ['original', 'class_mean_merged_full_epoch_085'];
   if ($('comparison').value === 'original_vs_full_epoch')
     return ['original', 'class_mean_merged_full_epoch'];
+  if ($('comparison').value === 'full_epoch_vs_self_occlusion')
+    return ['class_mean_merged_full_epoch', 'self_occlusion_full_epoch'];
   if ($('comparison').value === 'merged30_vs_full_epoch')
     return ['class_mean_merged_occlusion30_500', 'class_mean_merged_full_epoch'];
   if ($('comparison').value === 'original_vs_merged30')
@@ -136,6 +138,7 @@ function reviewKey() { return `mamma-review-${review.review_set_id}`; }
 function ratedModel(target, answer) {
   if ($('comparison').value === 'original_vs_full_epoch_085') return answer === 'B' ? 'class_mean_merged_full_epoch_085' : 'original';
   if ($('comparison').value === 'original_vs_full_epoch') return answer === 'B' ? 'class_mean_merged_full_epoch' : 'original';
+  if ($('comparison').value === 'full_epoch_vs_self_occlusion') return answer === 'B' ? 'self_occlusion_full_epoch' : 'class_mean_merged_full_epoch';
   if ($('comparison').value === 'merged30_vs_full_epoch') return answer === 'B' ? 'class_mean_merged_full_epoch' : 'class_mean_merged_occlusion30_500';
   if ($('comparison').value === 'original_vs_merged30') return answer === 'B' ? 'class_mean_merged_occlusion30_500' : 'original';
   if ($('comparison').value === 'occlusion30_vs_merged30') return answer === 'B' ? 'class_mean_merged_occlusion30_500' : 'class_mean_occlusion30_500';
@@ -562,6 +565,12 @@ async function init() {
   const occlusion30 = await (await fetch('/occlusion30')).json();
   const merged30 = await (await fetch('/merged30')).json();
   const fullEpoch = await (await fetch('/full-epoch')).json();
+  const selfResponse = await fetch('/self-occlusion');
+  const selfOcclusion = selfResponse.ok ? await selfResponse.json() : null;
+  if (!selfOcclusion) {
+    $('comparison').querySelector('[value="full_epoch_vs_self_occlusion"]').remove();
+    $('pairModel').querySelector('[value="self_occlusion_full_epoch"]').remove();
+  }
   if (mapping.review_set_id !== data.review_set_id) throw Error('模型映射与评审集不匹配');
   images = Object.fromEntries(data.images.map(im => [im.image_id, im])); targets = data.targets;
   const ids=targets.map(t=>t.target_id);
@@ -587,6 +596,13 @@ async function init() {
       JSON.stringify(fullEpoch.target_ids) !== JSON.stringify(ids))
     throw Error('全量一遍预测与固定评审集不匹配');
   for (const target of targets) target.class_mean_merged_full_epoch = fullEpoch.targets[target.target_id];
+  if (selfOcclusion && (selfOcclusion.schema !== 'real_riding_additional_predictions_v1' ||
+      selfOcclusion.model !== 'self_occlusion_full_epoch' ||
+      selfOcclusion.review_set_id !== data.review_set_id ||
+      JSON.stringify(selfOcclusion.target_ids) !== JSON.stringify(ids)))
+    throw Error('自遮挡试验预测与固定评审集不匹配');
+  if (selfOcclusion)
+    for (const target of targets) target.self_occlusion_full_epoch = selfOcclusion.targets[target.target_id];
   const originalReview = {schema:'real_riding_human_review_v1',review_set_id:data.review_set_id,assignment_seed:data.assignment_seed,
             model_identity:data.model_identity,
             target_ids:ids,revealed:false,entries:Object.fromEntries(ids.map(id=>[id,{position:'',visibility:'',mask_problem:false,note:'',judged_after_reveal:false}]))};
@@ -633,7 +649,16 @@ async function init() {
       class_mean_merged_full_epoch:fullEpochIdentity},
     target_ids:ids,revealed:true,comparison:['class_mean_merged_occlusion30_500','class_mean_merged_full_epoch'],
     entries:Object.fromEntries(ids.map(id=>[id,{position:'',visibility:'',mask_problem:false,note:'',judged_after_reveal:true}]))};
-  for (const [name, initial] of [['original_vs_finetuned',originalReview],['finetuned_vs_balanced',balancedReview],['balanced_vs_occlusion30',occlusionReview],['occlusion30_vs_merged30',mergedReview],['original_vs_merged30',originalMergedReview],['original_vs_full_epoch',originalFullReview],['original_vs_full_epoch_085',originalFull085Review],['merged30_vs_full_epoch',mergedFullReview]]) {
+  const selfOcclusionReview = selfOcclusion && {schema:'real_riding_human_review_v1',
+    review_set_id:`${data.review_set_id}_full_epoch05_vs_self_occlusion_trial05`,assignment_seed:data.assignment_seed,
+    model_identity:{class_mean_merged_full_epoch:{...fullEpochIdentity,visibility_threshold:0.5},
+      self_occlusion_full_epoch:{path:selfOcclusion.checkpoint,size_bytes:selfOcclusion.checkpoint_size_bytes,
+        mtime_ns:selfOcclusion.checkpoint_mtime_ns,visibility_threshold:0.5}},
+    target_ids:ids,revealed:true,comparison:['class_mean_merged_full_epoch','self_occlusion_full_epoch'],
+    entries:Object.fromEntries(ids.map(id=>[id,{position:'',visibility:'',mask_problem:false,note:'',judged_after_reveal:true}]))};
+  const reviewGroups = [['original_vs_finetuned',originalReview],['finetuned_vs_balanced',balancedReview],['balanced_vs_occlusion30',occlusionReview],['occlusion30_vs_merged30',mergedReview],['original_vs_merged30',originalMergedReview],['original_vs_full_epoch',originalFullReview],['original_vs_full_epoch_085',originalFull085Review],['merged30_vs_full_epoch',mergedFullReview]];
+  if (selfOcclusionReview) reviewGroups.push(['full_epoch_vs_self_occlusion',selfOcclusionReview]);
+  for (const [name, initial] of reviewGroups) {
     const draft=localStorage.getItem(`mamma-review-${initial.review_set_id}`);
     reviews[name]=initial;
     if (draft) {

@@ -8,6 +8,8 @@
 
 直接看图：在本项目目录用 `/mnt/data1/yy/home/yy/Repos/mamma/.venv/bin/python scripts/real_stitch_review_server.py --host 127.0.0.1 --port 18872`，打开 `http://127.0.0.1:18872/`。合图链的范围和局限见[真实演示合图报告](REAL_RIDING_STITCH_THRESHOLD085_20261025.md)。
 
+另有一项**原始 MAMMA 追加实验**：固定原模型阈值 0.5，在同一 40 对真实图片上比较直接合图与先做 SMPL-X 人体 fitting 再合图。它不使用上述微调权重，也不更改 0.85 微调交付。看图时运行 `/home/yy/conda_envs/camerahmr/bin/python scripts/fitting512/review_server.py --host 127.0.0.1 --port 18873`，打开 `http://127.0.0.1:18873/`；方法、结果和复现入口见[人体 fitting 对照说明](ORIGINAL_MAMMA_BODY_FITTING_20261025.md)。两组页面的人工评分分别保存。
+
 ## 检查入口及历史实验
 
 下列16/4划分、500步和batch=1说明属于早期实验；普通CPU检查仍可使用禁止训练的mamma_regular.json。最终版本以以上交付入口为准。
@@ -48,3 +50,5 @@ CUDA_VISIBLE_DEVICES='' "$MAMMA_PY" scripts/mamma_retrain.py check-data \
 源码入口与修改位置见 [CODE_GUIDE.md](CODE_GUIDE.md)。
 
 真实骑行图片没有人工 512 点真值。同帧 cam2/cam4 的[点位人工对照](REAL_RIDING_MANUAL_REVIEW_20261024.md)现以“原模型阈值 0.5 vs 合并数据全量一遍阈值 0.85”为默认独立评审组，旧 0.5 评分保留。想直接看最终画面，可按[真实双机演示合图说明](REAL_RIDING_STITCH_THRESHOLD085_20261025.md)启动本地页面，并排查看固定 40 对的原模型与 0.85 方案。用户目前的总体画面判断是两者效果相近，0.85 方案可用点更多；这不等于真实点位准确率的真值评价。当前运行中的旧服务不会自动加载新页面代码。
+
+另有一次独立的[自遮挡 unknown 补负例试验](SELF_OCCLUSION_UNKNOWN_TRIAL_20261025.md)：仅在身体射线与保存的渲染前景双重证据满足保守规则时，将试验包中的 -1 改为 0。它复用同一 28/7 场景、同一可训练观察顺序，从原权重重新训练一遍；旧包、默认标签规则、现有交付模型均未替换。报告给出同一旧标签验证集上的三模型指标及固定 319 个真实目标的独立看图入口。真实图没有人工真值，新的点位对照仍需用户判断。

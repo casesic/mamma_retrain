@@ -32,7 +32,7 @@
 <body>
 <header>
   <h1>真实骑行 · 双机演示合图对照</h1>
-  <p>固定 40 对同步 ERP，同一原图、mask、标定和合图算法。对照原模型阈值 0.5 与全量一遍模型阈值 0.85；两边独立重新配对和判断能否变形。</p>
+  <p id="comparisonDescription">固定 40 对同步 ERP，同一原图、mask、标定和合图算法。对照原模型阈值 0.5 与全量一遍模型阈值 0.85；两边独立重新配对和判断能否变形。</p>
   <p class="note">这是 riding-data 当前交付视频采用的<strong>简化演示合图</strong>：cam2 为参考，cam4 局部变形后按有效域硬覆盖；不是公司的最终合图实现，也不是 canonical CPW。配对数、点数和残差不能替代人工画面判断。</p>
 </header>
 <main>
@@ -43,7 +43,7 @@
     <span>切帧先显示快速预览；同步放大超过 2.5 倍时载入高清。滚轮缩放、拖动平移也同步。“打开无损合图”直接显示原分辨率 PNG。</span>
   </section>
   <p id="status">正在加载…</p>
-  <div class="grid">
+  <div class="grid" id="comparisonGrid">
     <section class="panel"><h2>原模型 · 可见阈值 0.5</h2><canvas id="original_050" width="1152" height="576"></canvas><p class="detail" id="detail-original_050"></p><a id="link-original_050" target="_blank" rel="noopener">打开无损合图</a></section>
     <section class="panel"><h2>全量一遍 · 可见阈值 0.85</h2><canvas id="full_epoch_085" width="1152" height="576"></canvas><p class="detail" id="detail-full_epoch_085"></p><a id="link-full_epoch_085" target="_blank" rel="noopener">打开无损合图</a></section>
   </div>
@@ -58,11 +58,17 @@
 <script>
 "use strict";
 const $ = id => document.getElementById(id);
-const branches = ['original_050', 'full_epoch_085'];
+let branches = ['original_050', 'full_epoch_085'];
 const view = {cx:2880, cy:1440, zoom:1};
 let index, boxes, pictures = {}, current = 0, review, version = 0;
 let highResRequested = false;
+const legacyLabels = {original_050:'原模型 · 可见阈值 0.5', full_epoch_085:'全量一遍 · 可见阈值 0.85'};
+function branchLabel(branch) { return index.branches[branch].label || legacyLabels[branch] || branch; }
 function reviewIdentity() {
+  if (index.review_set_id) return {schema:'real_riding_demo_stitch_human_review_v1',
+    review_set:index.review_set_id, selection:index.input_selection,
+    prediction_files:index.prediction_files, model_weights:index.model_weights,
+    branches:index.branches, pair_ids:index.pairs.map(row=>`${row.dataset}/${row.source_frame}`)};
   return {schema:'real_riding_demo_stitch_human_review_v1',
     review_set:'real_riding_40_pairs_original050_vs_full_epoch085',
     selection:index.input_selection, prediction_files:index.prediction_files,
@@ -119,7 +125,8 @@ function detail(branch,row) {
   const reasons=row.warp_admission.filter(x=>x.gate!=='admit').map(x=>x.gate).join('、');
   return `${row.status} · 配对 ${pairs} · 准入变形 ${admitted} · 用于变形的点对 ${points}`+
     (reasons ? ` · 拒绝：${reasons}` : '')+
-    (row.warp_failures.length ? ` · 变形失败 ${row.warp_failures.length}` : '');
+    (row.warp_failures.length ? ` · 变形失败 ${row.warp_failures.length}` : '')+
+    (row.fitting ? ` · 人体 fitting 成功 ${row.fitting.filter(x=>x.success).length}/${row.fitting.length}` : '');
 }
 async function show(number) {
   const thisVersion=++version;
@@ -155,7 +162,8 @@ function summary() {
   const values=Object.values(review.entries);
   const counted={original:0,same:0,trained:0,unknown:0,unreviewed:0};
   for (const value of values) counted[value.rating||'unreviewed']++;
-  $('summary').textContent=`人工评审：原模型更好 ${counted.original}，相近 ${counted.same}，全量一遍 0.85 更好 ${counted.trained}，无法判断 ${counted.unknown}，未评审 ${counted.unreviewed}。没有人工 GT；以上只统计您填写的判断。`;
+  const labels=branches.map(branchLabel);
+  $('summary').textContent=`人工评审：${labels[0]} 更好 ${counted.original}，相近 ${counted.same}，${labels[1]} 更好 ${counted.trained}，无法判断 ${counted.unknown}，未评审 ${counted.unreviewed}。没有人工 GT；以上只统计您填写的判断。`;
 }
 function save() {
   const row=index.pairs[current], key=`${row.dataset}/${row.source_frame}`;
@@ -216,8 +224,22 @@ async function importReview(file) {
 async function init() {
   const data=await(await fetch('/data')).json();
   index=data.index;boxes=data.target_boxes;
-  if (index.schema!=='real_riding_demo_stitch_comparison_v1'||index.pairs.length!==40)
+  if (!['real_riding_demo_stitch_comparison_v1','original_mamma_fitting_comparison_v1'].includes(index.schema)||
+      index.pairs.length!==40)
     throw Error('合图清单不完整');
+  branches=Object.keys(index.branches).filter(key=>key!=='full_epoch_050');
+  if (branches.length!==2) throw Error('合图对照必须为两组');
+  $('comparisonDescription').textContent=index.description || $('comparisonDescription').textContent;
+  $('comparisonGrid').replaceChildren(...branches.map(branch=>{
+    const section=document.createElement('section');section.className='panel';
+    const heading=document.createElement('h2');heading.textContent=branchLabel(branch);
+    const canvas=document.createElement('canvas');canvas.id=branch;canvas.width=1152;canvas.height=576;
+    const detail=document.createElement('p');detail.className='detail';detail.id=`detail-${branch}`;
+    const link=document.createElement('a');link.id=`link-${branch}`;link.target='_blank';link.rel='noopener';link.textContent='打开无损合图';
+    section.append(heading,canvas,detail,link);return section;
+  }));
+  $('rating').querySelector('[value="original"]').textContent=`${branchLabel(branches[0])} 更好`;
+  $('rating').querySelector('[value="trained"]').textContent=`${branchLabel(branches[1])} 更好`;
   $('pair').replaceChildren(...index.pairs.map((row,i)=>{
     const option=document.createElement('option');option.value=String(i);
     option.textContent=`${i+1}. ${row.dataset} / ${row.source_frame}`;return option;
@@ -237,8 +259,8 @@ async function init() {
   $('reset').onclick=()=>{Object.assign(view,{cx:2880,cy:1440,zoom:1});draw();};
   $('person').onclick=()=>{
     const pair=index.pairs[current];
-    const id=pair.branches.full_epoch_085.person_pairs[0]?.cam2_target ||
-             pair.branches.original_050.person_pairs[0]?.cam2_target;
+    const id=pair.branches[branches[1]].person_pairs[0]?.cam2_target ||
+             pair.branches[branches[0]].person_pairs[0]?.cam2_target;
     const box=boxes[id];
     if (!box) {alert('这帧没有可定位的配对人物；请在整图上滚轮放大。');return;}
     view.cx=(box[0]+box[2])/2;view.cy=(box[1]+box[3])/2;view.zoom=5;draw();

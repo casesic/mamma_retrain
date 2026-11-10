@@ -14,6 +14,7 @@ BALANCED = ROOT / "outputs/experiments/city_full_visibility_class_mean_20261024/
 OCCLUSION30 = ROOT / "outputs/experiments/city_full_occlusion_30pct_20261025/review_predictions_class_mean_occlusion30_500.json"
 MERGED30 = ROOT / "outputs/experiments/city_full_plus_occlusion_30pct_20261025/review_predictions_class_mean_merged_occlusion30_500.json"
 FULL_EPOCH = ROOT / "outputs/experiments/city_merged_one_epoch_20261025/review_predictions_class_mean_merged_full_epoch.json"
+SELF_OCCLUSION = ROOT / "outputs/experiments/self_occlusion_unknown_trial_20261025/review_predictions_self_occlusion_full_epoch.json"
 
 
 def permitted_files():
@@ -49,6 +50,8 @@ def handler(images, masks):
                 file, mime = MERGED30, "application/json"
             elif path == "/full-epoch":
                 file, mime = FULL_EPOCH, "application/json"
+            elif path == "/self-occlusion":
+                file, mime = SELF_OCCLUSION, "application/json"
             elif path.startswith("/image/") and path[len("/image/"):] in images:
                 file, mime = images[path[len("/image/"):]], "image/png"
             elif path.startswith("/mask/") and path[len("/mask/"):] in masks:
@@ -63,7 +66,7 @@ def handler(images, masks):
             self.send_response(200)
             self.send_header("Content-Type", mime)
             self.send_header("Content-Length", str(len(data)))
-            self.send_header("Cache-Control", "no-store" if path in ("/", "/data", "/reveal", "/balanced", "/occlusion30", "/merged30", "/full-epoch") else "private, max-age=3600")
+            self.send_header("Cache-Control", "no-store" if path in ("/", "/data", "/reveal", "/balanced", "/occlusion30", "/merged30", "/full-epoch", "/self-occlusion") else "private, max-age=3600")
             self.end_headers()
             self.wfile.write(data)
 

@@ -1,0 +1,19 @@
+{
+  "model_heads": ["joints2d", "visibility", "contact", "floor_contact"],
+  "coordinate_scale": 100.0,
+  "residual_cap": 25.0,
+  "optimizer": {"type": "AdamW", "lr": 1e-05, "betas": [0.9, 0.999], "weight_decay": 0.0001},
+  "schema": "mamma_training_v7",
+  "input_config": "../../outputs/experiments/self_occlusion_unknown_trial_20261025/split.json",
+  "crop_policy_version": "mask_bbox_periodic_v2",
+  "augmentation": "off",
+  "loss_enabled": {"coordinate": true, "visibility": true},
+  "visibility_reduction": "class_mean",
+  "execution_authorized": true,
+  "label_qualification": "qualified",
+  "model_config": "../../landmarks/configs/train/models_2d/config_mammanet_mask_512.yaml",
+  "tensor_state": "../../outputs/experiments/mamma_original_baseline_pilot_20261015/tensor_state.pt",
+  "sampler_seed": 20261024,
+  "batch_size": 4,
+  "sampling": {"mode": "one_epoch_v1", "plan": "../../outputs/experiments/self_occlusion_unknown_trial_20261025/sampling_plan.json"}
+}
