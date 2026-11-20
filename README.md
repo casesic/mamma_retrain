@@ -1,3 +1,9 @@
+> **Fork 说明：本仓是 [cuevhv/mamma](https://github.com/cuevhv/mamma) 的 fork（上游 MAMMA，CVPR 2026 Oral），不是上游官方仓库。**
+> 我在上游多相机动作捕捉推理链之上，加了**微调/重训流程、可见性阈值研究和数据适配**：`mamma_ext/`、`scripts/mamma_retrain.py`、`configs/retrain/`；上游 `landmarks/` 模型源码未改。
+> 结果：合成验证 7 场景 / 814 条观察，ERP 点均误差 **4.3954 px → 2.5242 px**（约 −42.6%），可见召回 82.64% → 91.33%（可见判定阈值 0.5 → 0.85）。
+> 只想跑我加的部分：见下方[「本 fork 做了什么」](#本-fork-做了什么微调与评价)；只用上游推理链：直接看 [Install](#install)。
+> 权重、训练数据和输出都不在仓库内（[交付说明](docs/DELIVERY_20261025.md)）；17 篇实验报告的状态索引在 [docs/INDEX.md](docs/INDEX.md)。
+
 <div align="center">
 
 # MAMMA: Markerless Accurate Multi-person Motion Acquisition
@@ -13,6 +19,71 @@ Hanz Cuevas Velasquez<sup>1\*</sup>, Anastasios Yiannakidis<sup>1\*</sup>, Soyon
 **[CVPR 2026 Oral]** | [Paper](https://openaccess.thecvf.com/content/CVPR2026/html/Velasquez_MAMMA_Markerless_Accurate_Multi-person_Motion_Acquisition_CVPR_2026_paper.html) | [arXiv](https://arxiv.org/abs/2506.13040) | [Project Page](https://mamma.is.tue.mpg.de/) | [Datasets](https://mamma.is.tue.mpg.de/download.php)
 
 </div>
+
+---
+
+## 本 fork 做了什么（微调与评价）
+
+上游 MAMMA 给的是「多相机视频 → SMPL-X」推理链（`ma_cap → ma_masks → ma_2d → ma_3d → ma_vis`）。**本 fork 在这条链之上，加了「用自产合成数据微调 2D 点位模型并做定量评价」这一层**：上游 `landmarks/` 的模型源码没有改，微调入口只经由 `mamma_ext/upstream.py` 复用其中两个裁剪数学函数。
+
+| 我加的部分 | 在哪 | 做什么 |
+|---|---|---|
+| 数据 / 任务 / 模型 / 恢复适配 | `mamma_ext/` | 逐包读取 `mamma_bundle_v1` 数据包、由目标 mask 求框、有序 512 点标签、坐标 + uncertainty + visibility 损失、checkpoint 严格恢复 |
+| 训练与评价入口 | `scripts/mamma_retrain.py` | `plan` / `check-data` / `train` / `evaluate` 四条子命令 |
+| 训练配置与数据划分 | `configs/retrain/` | 通用配置 `execution_authorized=false`，不显式 `--execute` 不会训练 |
+| 实验记录 | `docs/*_2026*.md` + [docs/INDEX.md](docs/INDEX.md) | 17 篇按日期归档，逐篇标注「结论仍有效 / 已被覆盖 / 仅历史」 |
+
+完整状态与限制先看 [docs/MAMMA_CURRENT_ENTRY.md](docs/MAMMA_CURRENT_ENTRY.md)，交付边界看 [docs/DELIVERY_20261025.md](docs/DELIVERY_20261025.md)，改代码从 [docs/CODE_GUIDE.md](docs/CODE_GUIDE.md) 进。
+
+### 结果
+
+原模型（可见阈值 0.5）对比本轮微调权重（0.85），同一套统一验证集：
+
+| 指标（合成验证：7 场景 / 814 条观察） | 原模型（阈值 0.5） | 微调后（阈值 0.85） |
+|---|---:|---:|
+| ERP 点均误差 | 4.3954 px | **2.5242 px** |
+| 可见召回 | 82.64% | **91.33%** |
+| 遮挡召回 | 95.73% | 94.76% |
+
+点均误差下降约 **42.6%**。注意两栏阈值不同、不能混用：同一份微调权重在默认阈值 0.5 下是可见召回 98.42% / 遮挡召回 85.94%，换成 0.85 是拿可见漏判换回遮挡召回的结果。以上每个数字的原句都在 [docs/DELIVERY_20261025.md](docs/DELIVERY_20261025.md)，逐点重算过程在 [docs/CITY_MERGED_FULL_EPOCH_20261025.md](docs/CITY_MERGED_FULL_EPOCH_20261025.md)。
+
+**引用这三组数字时必须同时带上三条 caveat**（原文见上述交付说明）：
+
+1. **阈值是同集选的。** 0.85 是看过这份验证集之后选的，结果属于同集选择后的描述性结果，不是独立验证得出的最优点。
+2. **不是独立测试。** 这是合成验证集；真实骑行图片没有人工点位真值，目前的人工判断是总体画面意见，不是逐帧评分或真实准确率。
+3. **配对可能不同。** 40 对真实图片里共同成功的 35 帧，可用点对 2,474 → 3,665（约 +48.1%），但人物配对可能不同，不能据此宣称点对精度提高；更多点尚未转化成明显的合图视觉提升。
+
+另外，微调权重目前**没有替换部署 engine**，演示合图仍是原模型 0.5 与本轮 0.85 并排对照。
+
+### 复现我的部分
+
+前提：上游环境按 [docs/INSTALL.md](docs/INSTALL.md) 装好；**训练与验证数据需自备**——每个包是 `mamma_bundle_v1` 结构（`observations.json` + RGB + 目标人物 mask + 有序 512 点标签），由同门的 `human_data_generator` 产出，本仓库不含数据、权重和 `outputs/`。所以这里能复现的是流程与命令，不是一串可直接下载的权重；没有这套数据时，第 1 步的合同检查也会直接报缺包。
+
+```bash
+export PYTHONPATH=.:src
+export PYTHON_DOTENV_DISABLED=1 PYTHONDONTWRITEBYTECODE=1 OPENBLAS_NUM_THREADS=1
+
+# 1) 只读合同检查（不加载模型、不碰 GPU）：清单 / 包内文件 / 身份 / 时间 / 点序
+python scripts/mamma_retrain.py plan      --config configs/retrain/mamma_regular.json --split validation
+python scripts/mamma_retrain.py check-data --config configs/retrain/mamma_regular.json --split validation --limit 2
+
+# 2) 冻结本次取样顺序（一次完整遍历，已有计划不可重写）
+python -m scripts.freeze_one_epoch_plan \
+  --config configs/retrain/mamma_city_merged_one_epoch_20261025.json \
+  --output outputs/experiments/city_merged_one_epoch_20261025/sampling_plan.json
+
+# 3) 训练：3245 条有监督观察各一次，batch=4，共 812 次优化器更新（尾批 1 条）
+#    输出目录必须是新的；不加 --execute 只做前置检查
+python scripts/mamma_retrain.py train \
+  --config configs/retrain/mamma_city_merged_one_epoch_20261025.json \
+  --device cuda:0 --max-updates 812 --checkpoint-every 500 \
+  --output outputs/experiments/city_merged_one_epoch_20261025/train_full --execute
+
+# 4) 从已保存的逐样本预测统一重算 814 条指标（不重新加载模型或图片）
+python -m scripts.full_epoch_compare --combined
+```
+
+预期产物：`outputs/experiments/city_merged_one_epoch_20261025/` 下的 checkpoint、`sampling_plan.json` 与 `combined_validation_comparison.json`。这些都在 `.gitignore` 里，不会进 Git。
 
 ## News
 - [2026-06] 🎉 MAMMA being presented at CVPR 2026
