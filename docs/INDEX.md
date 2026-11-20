@@ -40,6 +40,7 @@
 
 | 文档 | 什么时候看 |
 |---|---|
+| [UPSTREAM](UPSTREAM.md) | 上游 README 原文：安装、demo、数据集、GUI 怎么跑（本 fork 没改推理链） |
 | [MAMMA_CURRENT_ENTRY](MAMMA_CURRENT_ENTRY.md) | **当前状态第一入口**：现在用哪个权重、哪个阈值、哪些说法已过期 |
 | [DELIVERY](DELIVERY_20261025.md) | 交付边界：哪些产物不在 Git 里、迁移时要一起带走什么 |
 | [CODE_GUIDE](CODE_GUIDE.md) | 要改代码时从哪读进去（数据、损失、恢复三条线） |
