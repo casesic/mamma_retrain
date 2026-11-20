@@ -47,6 +47,7 @@
 | [CONFIGS](CONFIGS.md) | 训练/推理配置怎么改 |
 | [DATASETS](DATASETS.md) | 上游五个数据集族与下载脚本 |
 | [YOUR-DATA](YOUR-DATA.md) | 换成自己的拍摄数据要怎么摆 |
+| [PIPELINE_CONTRACT](PIPELINE_CONTRACT.md) | 四个仓库怎么交接：每段的输入/输出/格式定义/消费者，以及仍是断点的地方 |
 | [A3_DATA_HANDOFF](A3_DATA_HANDOFF.md) | 数据包格式（`mamma_bundle_v1`）与划分范围的决定 |
 | [steps](steps.md) | 上游五步流水线（`ma_cap → … → ma_vis`）的代码位置 |
 
