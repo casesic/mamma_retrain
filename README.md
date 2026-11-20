@@ -1,5 +1,5 @@
 > **Fork 说明：本仓是 [cuevhv/mamma](https://github.com/cuevhv/mamma) 的 fork（上游 MAMMA，CVPR 2026 Oral），不是上游官方仓库。**
-> 我在上游多相机动作捕捉推理链之上，加了**微调/重训流程、可见性阈值研究和数据适配**：`mamma_ext/`、`scripts/mamma_retrain.py`、`configs/retrain/`；上游 `landmarks/` 模型源码未改。
+> 我在上游多相机动作捕捉推理链之上，加了**微调/重训流程、可见性阈值研究和数据适配**：`mamma_ext/`、`scripts/mamma_retrain.py`、`configs/retrain/`；上游 `landmarks/` 只动了一个读数据的文件（见下）。
 > 结果：合成验证 7 场景 / 814 条观察，ERP 点均误差 **4.3954 px → 2.5242 px**（约 −42.6%），可见召回 82.64% → 91.33%（可见判定阈值 0.5 → 0.85）。
 > 只想跑我加的部分：见下方[「本 fork 做了什么」](#本-fork-做了什么微调与评价)；只用上游推理链：直接看 [Install](#install)。
 > 权重、训练数据和输出都不在仓库内（[交付说明](docs/DELIVERY_20261025.md)）；17 篇实验报告的状态索引在 [docs/INDEX.md](docs/INDEX.md)。
@@ -24,7 +24,9 @@ Hanz Cuevas Velasquez<sup>1\*</sup>, Anastasios Yiannakidis<sup>1\*</sup>, Soyon
 
 ## 本 fork 做了什么（微调与评价）
 
-上游 MAMMA 给的是「多相机视频 → SMPL-X」推理链（`ma_cap → ma_masks → ma_2d → ma_3d → ma_vis`）。**本 fork 在这条链之上，加了「用自产合成数据微调 2D 点位模型并做定量评价」这一层**：上游 `landmarks/` 的模型源码没有改，微调入口只经由 `mamma_ext/upstream.py` 复用其中两个裁剪数学函数。
+上游 MAMMA 给的是「多相机视频 → SMPL-X」推理链（`ma_cap → ma_masks → ma_2d → ma_3d → ma_vis`）。**本 fork 在这条链之上，加了「用自产合成数据微调 2D 点位模型并做定量评价」这一层**，自写实现都在 `mamma_ext/`（10 个文件）。
+
+与上游最后一次合并（`588492f`）相比，本 fork 的改动落在 `mamma_ext/`、`scripts/`、`configs/`、`tests/`、`review/`、`docs/`；`landmarks/` 里只有一个文件被动过：`landmarks/lib/datasets/vitdet_dataset.py`（+40 / −12），加了 `fast_inference` 分支，只对扩张后的人物框做局部裁剪和高斯模糊，其余逻辑不变。`mamma_ext/upstream.py` 只复用该目录 `utils_eval.py` 里的两个裁剪数学函数，`utils_eval.py` 本身未改。
 
 | 我加的部分 | 在哪 | 做什么 |
 |---|---|---|
