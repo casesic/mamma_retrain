@@ -1,6 +1,6 @@
 # 从哪里读懂 MAMMA 微调代码
 
-如果只是想检查数据或了解当前限制，先看[当前使用说明](MAMMA_CURRENT_ENTRY.md)。这份指南写给要修改我们自写代码的人；克隆的 MAMMA 模型源码在 `landmarks/`，本轮微调入口不会改动它。
+如果只是想检查数据或了解当前限制，先看[当前使用说明](MAMMA_CURRENT_ENTRY.md)。这份指南写给要修改我们自写代码的人；克隆的 MAMMA 模型源码在 `landmarks/`，本轮微调入口不会改动它（仓库层面唯一的改动是 `landmarks/lib/datasets/vitdet_dataset.py` 里的 `fast_inference` 局部裁剪分支，+40 / −12）。
 
 ## 从一条命令跟进去
 
