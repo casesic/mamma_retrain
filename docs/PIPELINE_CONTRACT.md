@@ -6,26 +6,29 @@
 
 ## 总览
 
-交接单里的画法是直线：
+交接单里画的是四段直线。按仓库文档和作者 2026-10-26 的双周报核对，真实情况是**两件事叠在一起**：
+
+**（一）方法演进：一条路线替代另一条。** 不是串联，而是同一任务换了主方案：
 
 ```text
-合成数据（human_data_generator）
-  → DenseKP 重训（densekp_retrain）
-  → MAMMA 微调与评价（mamma_retrain）
-  → 真实合图（Panorama-Stitch-Lab）
+人体重建 → 投影            链路长，参数估计环节多
+  → DenseKP               直接预测二维人体点（138 点）；两路独立预测可能不一致
+  → DenseKP ＋ fitting    引入共同人体几何约束；此前有改善，多人遮挡仍薄弱
+  → MAMMA                 实测整体更好 → 主方案转向 MAMMA（有序 512 点 + 可见性）
+  → 微调 / fitting        合成数据指标改善；真实画面与原模型相近
 ```
 
-按仓库文档核对下来，实际是**一个数据源、两个训练消费者**：
+**结论**：最终链路用 **MAMMA 的 512 点**，DenseKP 及其 fitting 路线**保留为历史对照**。合成数据工作最初是为 DenseKP 做的，后来才适配到 MAMMA——这解释了为什么生成器会反向引用 `densekp_retrain` 的产物目录。
+
+**（二）仓库分工：一个数据源，两个训练消费者。**
 
 ```text
 human_data_generator
   ├─ observations.json + RGB + 目标人物 mask + 有序 512 点
-  │    ├──→ mamma_retrain    （微调 MAMMA 的 2D 点位模型，512 点）
-  │    └──→ densekp_retrain  （训练 DenseKP，138 个语义点）
-  └─────→ Panorama-Stitch-Lab 读 DenseKP 的 138 点模型做真实合图与 staged-LM 拟合
+  │    ├──→ mamma_retrain    （微调 MAMMA 的 2D 点位模型，512 点）→ 真实合图
+  │    └──→ densekp_retrain  （训练 DenseKP，138 点）→ 历史对照路线
+  └─────→ Panorama-Stitch-Lab 在真实鱼眼/ERP 上做配对、变形与合图（主方案对应点取 MAMMA 512 点）
 ```
-
-证据：`human_data_generator/README.md` 写「供 MAMMA 训练使用」；`densekp_retrain/docs/README.md` 把「MAMMA 512 当前生成入口」指向 `human_data_generator`；`Panorama-Stitch-Lab` 的交付链说明读的是 DenseKP 138 点（[densekp_production_delivery_refactor](https://github.com/casesic/Panorama-Stitch-Lab/blob/ssh_main/docs/Architecture/formulate/densekp_production_delivery_refactor.md)）。
 
 ## 第 1 段：合成数据（human_data_generator）
 
@@ -91,8 +94,21 @@ python scripts/mamma_retrain.py check-data --config configs/retrain/mamma_regula
 
 字段缺失、点序不一致、包内文件对不上会在这两步直接报错——这比读文档更能判断链条有没有断。
 
-## 仍是断点的地方（文档里没写明，待作者确认）
+## 三个曾经断掉的地方，现在有答案了
 
-1. **512 点与 138 点之间怎么对应**：`mamma_retrain` 用 512 点模板，`densekp_retrain` 用 138 点算子（`R[138,10475]`）。两者都从同一个身体网格出发，但仓库里**没有一份文档写明 512 → 138 的索引表或映射规则**。
-2. **真实合图到底用哪条对应**：`mamma_retrain` 的真实合图对照用的是 512 点对（共同成功 35 帧、点对 2474 → 3665），`Panorama-Stitch-Lab` 的 DenseKP runtime 用的是 138 点。两条是不是会汇合、以谁为准，文档里没有结论。
-3. **资产与标定的唯一来源**：`human_data_generator` 的 `config/resources.json` 指向 `densekp_retrain/outputs/.../prepared_scene/calibration`。也就是生成器反过来依赖了重训仓的产物目录——这是有意为之还是历史遗留，需要作者说明。
+这三条之前写在「待作者确认」，作者 2026-10-26 的双周报给了答案。**证据是仓库外的一份 PPT**（`20261026.pptx`，12 页），没有进 Git，所以下面对应到仓库文档的地方我尽量给仓库内的锚点；找不到锚点的会写明「仅 PPT」。
+
+1. **512 点与 138 点不是上下游映射，而是两条竞争路线。**
+   DenseKP 直接回归 138 个身体语义点（算子定义见 `densekp_retrain/docs/CONTRACTS.md` 的 `R[138,10475]`）；MAMMA 输出有序 512 点 + 可见性。两者都在解「跨相机同一人体点对应」，选型上 MAMMA 胜出，DenseKP 降为历史对照。所以仓库里**没有** 512→138 的索引表是正常的，不是缺失。
+
+2. **真实合图用的是 MAMMA 的 512 点**，不是 DenseKP 的 138 点。
+   最终链路「双机图像 → 检测/分割 → 原 MAMMA（512 点 + 可见性）→ 跨机配对筛点 → 变形合图」，其中原 MAMMA 是主方案、微调 MAMMA 是可选模型、MAMMA＋fitting 是可选分支。（仅 PPT；本仓 [DELIVERY](DELIVERY_20261025.md) 的合图对照同样是 512 点对，与之一致。）
+
+3. **生成器反向指向 `densekp_retrain` 的产物目录，是历史依赖，不是设计。**
+   `human_data_generator/config/resources.json` 里的 `calibration_dir` 指向 `densekp_retrain/outputs/.../prepared_scene/calibration`，因为数据生产最初服务 DenseKP。要彻底解耦需要把标定搬进生成器自己的资产目录——目前没有做。
+
+## 还有一个没解开的：数字口径
+
+2026-10-26 双周报里「微调 MAMMA」一栏写的是 **2.49 px / 可见 95.53% / 遮挡 91.18%**；这组数在本仓对应的是[自遮挡补负例试验](SELF_OCCLUSION_UNKNOWN_TRIAL_20261025.md)（该报告明确写「原数据包、默认标签规则和既有交付模型没有改动」）。而交付定稿用的是 812 步权重 + 0.85 阈值 → **91.33% / 94.76%**（见 [DELIVERY](DELIVERY_20261025.md)）。
+
+作者 2026-11-20 确认：**对外统一用交付口径（0.85 阈值）**。双周报那组数字来自试验分支，不作为当前结论；两者不是同一份权重，不能混引。

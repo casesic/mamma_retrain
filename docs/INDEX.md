@@ -32,7 +32,7 @@
 | 10-25 | [CITY_MERGED_OCCLUSION_30PCT](CITY_MERGED_OCCLUSION_30PCT_20261025.md) | 合并 500 步：旧验证 2.76 → 1.84 px，新验证 6.33 → 4.40 px，遮挡召回下降 | 已被覆盖 | 主口径改为 814 条统一验证 |
 | 10-25 | [CITY_MERGED_FULL_EPOCH](CITY_MERGED_FULL_EPOCH_20261025.md) | 全量一遍 812 次更新：4.3954 → 2.5242 px，并定下 0.85 阈值 | 结论仍有效 | **头条数字的出处**（第 19–25 行） |
 | 10-25 | [REAL_RIDING_STITCH_THRESHOLD085](REAL_RIDING_STITCH_THRESHOLD085_20261025.md) | 40 对真实合图：成功变形 37 → 35 帧；共同 35 帧点对 2474 → 3665 | 结论仍有效 | 真实图无人工点对真值，只能看可用点多少 |
-| 10-25 | [SELF_OCCLUSION_UNKNOWN_TRIAL](SELF_OCCLUSION_UNKNOWN_TRIAL_20261025.md) | 4cm 双证据补负例：遮挡召回 85.94% → 91.18% | 仅历史 | 试验分支，未纳入交付：原数据包与默认标签策略都未改 |
+| 10-25 | [SELF_OCCLUSION_UNKNOWN_TRIAL](SELF_OCCLUSION_UNKNOWN_TRIAL_20261025.md) | 4cm 双证据补负例：遮挡召回 85.94% → 91.18% | 仅历史 | 试验分支：原数据包与默认标签策略都未改。**注意**：2026-10-26 双周报把这条的 95.53% / 91.18% 当作「微调 MAMMA」汇报过；对外口径以 [DELIVERY](DELIVERY_20261025.md) 的 0.85 阈值为准（91.33% / 94.76%），两组不是同一份权重 |
 | 10-25 | [ORIGINAL_MAMMA_BODY_FITTING](ORIGINAL_MAMMA_BODY_FITTING_20261025.md) | 原权重后接 SMPL-X fitting，画面与直接合图基本一致 | 结论仍有效 | 建议保留原 MAMMA 直接合图为默认路径 |
 | 10-25 | [DELIVERY](DELIVERY_20261025.md) | 交付收尾：812 步权重 + 0.85 阈值，未替换部署 engine | 结论仍有效 | 本轮交付汇总，含权重校验值与保存范围 |
 

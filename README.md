@@ -59,6 +59,8 @@ Hanz Cuevas Velasquez<sup>1\*</sup>, Anastasios Yiannakidis<sup>1\*</sup>, Soyon
 
 另外，微调权重目前**没有替换部署 engine**，演示合图仍是原模型 0.5 与本轮 0.85 并排对照。
 
+**加速（数字没有留记录）**：2026-10 的双周报里记过「单人单相机处理速度由 1 FPS 提升至 32 FPS」，但仓库里没有对应的 benchmark 日志、硬件和命令，所以这里只按作者回忆列一句，**不作为可复现结果**。四个仓库里唯一有来源可查的性能记录在 `Panorama-Stitch-Lab` 的 `benchmarks/RESULTS.md`（C++ staged-LM：5 FPS → 25–30 FPS，RTX 3090）。
+
 ### 复现我的部分
 
 前提：上游环境按 [docs/INSTALL.md](docs/INSTALL.md) 装好；**训练与验证数据需自备**——每个包是 `mamma_bundle_v1` 结构（`observations.json` + RGB + 目标人物 mask + 有序 512 点标签），由同门的 `human_data_generator` 产出，本仓库不含数据、权重和 `outputs/`。所以这里能复现的是流程与命令，不是一串可直接下载的权重；没有这套数据时，第 1 步的合同检查也会直接报缺包。
@@ -125,6 +127,8 @@ Landmark error drops by about **42.6%**. The two column thresholds differ and mu
 3. **Pairings may differ.** Of 40 real image pairs, 35 deformed successfully under both models; usable point pairs went 2,474 → 3,665 (≈ +48.1%). But the person pairings may differ, so this does not show higher point-pair accuracy, and the extra points have not yet turned into an obvious visual gain in the stitched images.
 
 The fine-tuned weights have **not replaced the deployed engine**; the demo comparison still runs the original model at 0.5 side by side with this one at 0.85.
+
+**Speed-up (unrecorded)**: a 2026-10 status report claimed single-person single-camera processing went from 1 FPS to 32 FPS. There is no benchmark log, hardware note or command behind it in this repo, so it is listed as an author recollection and **not** as a reproducible result. The only sourced performance numbers live in `Panorama-Stitch-Lab`'s `benchmarks/RESULTS.md`.
 
 ### Reproducing this fork's part
 
