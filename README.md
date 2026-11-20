@@ -1,3 +1,5 @@
+<sub>**语言 / Language：** [中文](#本-fork-做了什么微调与评价) · [English](#what-this-fork-adds)</sub>
+
 > **Fork 说明：本仓是 [cuevhv/mamma](https://github.com/cuevhv/mamma) 的 fork（上游 MAMMA，CVPR 2026 Oral），不是上游官方仓库。**
 > 我在上游多相机动作捕捉推理链之上，加了**微调/重训流程、可见性阈值研究和数据适配**：`mamma_ext/`、`scripts/mamma_retrain.py`、`configs/retrain/`；上游 `landmarks/` 只动了一个读数据的文件（见下）。
 > 结果：合成验证 7 场景 / 814 条观察，ERP 点均误差 **4.3954 px → 2.5242 px**（约 −42.6%），可见召回 82.64% → 91.33%（可见判定阈值 0.5 → 0.85）。
@@ -86,6 +88,73 @@ python -m scripts.full_epoch_compare --combined
 ```
 
 预期产物：`outputs/experiments/city_merged_one_epoch_20261025/` 下的 checkpoint、`sampling_plan.json` 与 `combined_validation_comparison.json`。这些都在 `.gitignore` 里，不会进 Git。
+
+---
+
+## What this fork adds
+
+This repo is a fork of [cuevhv/mamma](https://github.com/cuevhv/mamma) (MAMMA, CVPR 2026 Oral) — it is **not** the upstream repository. Upstream ships the multi-camera video → SMPL-X inference chain (`ma_cap → ma_masks → ma_2d → ma_3d → ma_vis`). **This fork adds the layer above that chain: fine-tuning the 2D landmark model on self-produced synthetic data, with a quantitative evaluation of the result.** All first-party code lives in `mamma_ext/` (10 files).
+
+Measured against upstream's last merge (`588492f`), the changes touch `mamma_ext/`, `scripts/`, `configs/`, `tests/`, `review/` and `docs/`. Exactly one file under `landmarks/` was modified: `landmarks/lib/datasets/vitdet_dataset.py` (+40 / −12) gains a `fast_inference` branch that crops and blurs only the expanded person box; the rest of its logic is unchanged. `mamma_ext/upstream.py` reuses two crop-math helpers from `landmarks/lib/datasets/utils_eval.py`, which is untouched.
+
+| Added | Where | What it does |
+|---|---|---|
+| Data / task / model / recovery adapters | `mamma_ext/` | Reads `mamma_bundle_v1` packages one by one, derives the box from the target mask, loads ordered 512-point labels, coordinate + uncertainty + visibility losses, strict checkpoint recovery |
+| Training & evaluation CLI | `scripts/mamma_retrain.py` | `plan` / `check-data` / `train` / `evaluate` |
+| Training configs & splits | `configs/retrain/` | The generic config is `execution_authorized=false`; nothing trains without an explicit `--execute` |
+| Experiment records | `docs/*_2026*.md` + [docs/INDEX.md](docs/INDEX.md) | 17 dated reports, each labelled 结论仍有效 / 已被覆盖 / 仅历史 (still valid / superseded / history only) |
+
+For current state and its limits start at [docs/MAMMA_CURRENT_ENTRY.md](docs/MAMMA_CURRENT_ENTRY.md), for the delivery boundary at [docs/DELIVERY_20261025.md](docs/DELIVERY_20261025.md), and to modify code at [docs/CODE_GUIDE.md](docs/CODE_GUIDE.md).
+
+### Results
+
+Original model (visibility threshold 0.5) vs. this fork's fine-tuned weights (0.85), on one unified validation set:
+
+| Metric (synthetic validation: 7 scenes / 814 observations) | Original (threshold 0.5) | Fine-tuned (threshold 0.85) |
+|---|---:|---:|
+| Mean ERP landmark error | 4.3954 px | **2.5242 px** |
+| Visible recall | 82.64% | **91.33%** |
+| Occluded recall | 95.73% | 94.76% |
+
+Landmark error drops by about **42.6%**. The two column thresholds differ and must not be mixed: at the default 0.5 the same fine-tuned weights give 98.42% visible / 85.94% occluded recall, and 0.85 trades visible misses back for occluded recall. Every number above is quoted verbatim in [docs/DELIVERY_20261025.md](docs/DELIVERY_20261025.md); the point-by-point recomputation is in [docs/CITY_MERGED_FULL_EPOCH_20261025.md](docs/CITY_MERGED_FULL_EPOCH_20261025.md).
+
+**Three caveats travel with these numbers** (wording from the delivery note):
+
+1. **The threshold was chosen on the same set.** 0.85 was picked after looking at this validation set, so the result is a descriptive number from an in-set choice, not an independently validated optimum.
+2. **Not an independent test.** The validation set is synthetic. Real riding footage has no human-labelled landmark ground truth, so the human judgment so far is a holistic impression of the stitched images, not per-frame scoring or real accuracy.
+3. **Pairings may differ.** Of 40 real image pairs, 35 deformed successfully under both models; usable point pairs went 2,474 → 3,665 (≈ +48.1%). But the person pairings may differ, so this does not show higher point-pair accuracy, and the extra points have not yet turned into an obvious visual gain in the stitched images.
+
+The fine-tuned weights have **not replaced the deployed engine**; the demo comparison still runs the original model at 0.5 side by side with this one at 0.85.
+
+### Reproducing this fork's part
+
+Prerequisites: the upstream environment per [docs/INSTALL.md](docs/INSTALL.md), and **your own training/validation data** — each package is a `mamma_bundle_v1` layout (`observations.json` + RGB + target-person mask + ordered 512-point labels) produced by the sibling `human_data_generator` repo. Weights, data and `outputs/` are not in this repo, so what reproduces here is the procedure, not a downloadable checkpoint; without that data, step 1 fails on missing packages.
+
+```bash
+export PYTHONPATH=.:src
+export PYTHON_DOTENV_DISABLED=1 PYTHONDONTWRITEBYTECODE=1 OPENBLAS_NUM_THREADS=1
+
+# 1) Read-only contract checks (no model, no GPU): manifest / package files / identity / timestamps / point order
+python scripts/mamma_retrain.py plan      --config configs/retrain/mamma_regular.json --split validation
+python scripts/mamma_retrain.py check-data --config configs/retrain/mamma_regular.json --split validation --limit 2
+
+# 2) Freeze the sampling order for this run (one full pass; an existing plan is never rewritten)
+python -m scripts.freeze_one_epoch_plan \
+  --config configs/retrain/mamma_city_merged_one_epoch_20261025.json \
+  --output outputs/experiments/city_merged_one_epoch_20261025/sampling_plan.json
+
+# 3) Train: each of the 3245 supervised observations once, batch=4, 812 optimizer updates (last batch has 1)
+#    The output directory must be new; without --execute this is a preflight check only
+python scripts/mamma_retrain.py train \
+  --config configs/retrain/mamma_city_merged_one_epoch_20261025.json \
+  --device cuda:0 --max-updates 812 --checkpoint-every 500 \
+  --output outputs/experiments/city_merged_one_epoch_20261025/train_full --execute
+
+# 4) Recompute the 814-observation metrics from saved per-sample predictions (no model or image reload)
+python -m scripts.full_epoch_compare --combined
+```
+
+Expected artifacts: the checkpoint, `sampling_plan.json` and `combined_validation_comparison.json` under `outputs/experiments/city_merged_one_epoch_20261025/`. All of it is gitignored.
 
 ## News
 - [2026-06] 🎉 MAMMA being presented at CVPR 2026
